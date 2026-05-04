@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from './store'
 import { CurrentPeriod } from './components/CurrentPeriod'
+import { UpcomingPeriod } from './components/UpcomingPeriod'
 import { BillsManager } from './components/BillsManager'
 import { QuickLinks } from './components/QuickLinks'
 import { Charts } from './components/Charts'
@@ -81,7 +82,6 @@ export default function App() {
     setPeriodsWindowDate(null)
   }
 
-  const windowEnd = periods[windowStartIdx + periodsVisible - 1]
   const windowLabel = visible.length > 0
     ? `${formatDate(visible[0].startDate)} – ${formatDate(periodEndDate(visible[visible.length - 1].startDate, payFrequency))}`
     : ''
@@ -238,7 +238,7 @@ export default function App() {
                   <div className="text-xs text-slate-500 uppercase tracking-widest mb-3">Coming Up</div>
                   <div className="space-y-3">
                     {upcoming.map(p => (
-                      <CurrentPeriod key={p.id} periodId={p.id} label="Upcoming" collapsible />
+                      <UpcomingPeriod key={p.id} periodId={p.id} />
                     ))}
                   </div>
                 </div>

@@ -298,7 +298,8 @@ export function BillsManager() {
   const [adding, setAdding] = useState(false)
 
   const fixed = bills.filter(b => b.category === 'fixed')
-  const variable = bills.filter(b => b.category !== 'fixed')
+  const variable = bills.filter(b => b.category === 'variable')
+  const savings = bills.filter(b => b.category === 'savings')
 
   function handleSave(id: string | null, form: BillFormState) {
     const amt = parseFloat(form.amount)
@@ -353,6 +354,7 @@ export function BillsManager() {
 
       <Section title="Fixed Bills" items={fixed} />
       <Section title="Every Period" items={variable} />
+      {savings.length > 0 && <Section title="Savings" items={savings} />}
 
       <div className="px-4 py-4">
         {adding ? (

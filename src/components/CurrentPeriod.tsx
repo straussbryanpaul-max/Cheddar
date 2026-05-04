@@ -55,6 +55,7 @@ export function CurrentPeriod({ periodId, label = 'Current Period', collapsible 
   })
   const fixedItems = visibleItems.filter(i => billMap.get(i.billId)?.category === 'fixed')
   const variableItems = visibleItems.filter(i => billMap.get(i.billId)?.category === 'variable')
+  const savingsItems = visibleItems.filter(i => billMap.get(i.billId)?.category === 'savings')
 
   // Opening balance = what you have AFTER this period's paycheck lands.
   // For projected periods: prev forecast (leftover) + this paycheck.
@@ -241,6 +242,20 @@ export function CurrentPeriod({ periodId, label = 'Current Period', collapsible 
           })}
         </div>
       </div>
+
+      {/* Savings */}
+      {savingsItems.length > 0 && (
+        <div className="px-4 pt-4">
+          <div className="text-xs text-slate-500 uppercase tracking-widest px-3 mb-1">Savings</div>
+          <div className="divide-y divide-slate-700/50">
+            {savingsItems.map(item => {
+              const bill = billMap.get(item.billId)
+              if (!bill) return null
+              return <LineItem key={item.id} item={item} bill={bill} onDismiss={() => dismissPeriodItem(item.id)} />
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Extras */}
       {extras.length > 0 && (

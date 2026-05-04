@@ -14,6 +14,7 @@ export function UpcomingPeriod({ periodId }: Props) {
   const allItems = useStore(s => s.periodItems)
   const allExtras = useStore(s => s.extras)
   const ensurePeriodItems = useStore(s => s.ensurePeriodItems)
+  const payFrequency = useStore(s => s.payFrequency)
   const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
@@ -28,6 +29,7 @@ export function UpcomingPeriod({ periodId }: Props) {
 
   const fixedItems = items.filter(i => billMap.get(i.billId)?.category === 'fixed')
   const variableItems = items.filter(i => billMap.get(i.billId)?.category === 'variable')
+  const savingsItems = items.filter(i => billMap.get(i.billId)?.category === 'savings')
   const forecast = calcForecast(period, items, bills, extras)
 
   const forecastColor =
@@ -48,7 +50,7 @@ export function UpcomingPeriod({ periodId }: Props) {
         <div className="text-left">
           <div className="text-xs text-slate-500 uppercase tracking-widest mb-0.5">Upcoming</div>
           <div className="text-sm font-medium text-slate-300">
-            {formatDate(period.startDate)} — {formatDate(periodEndDate(period.startDate))}
+            {formatDate(period.startDate)} — {formatDate(periodEndDate(period.startDate, payFrequency))}
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -97,6 +99,24 @@ export function UpcomingPeriod({ periodId }: Props) {
               <div className="text-xs text-slate-500 uppercase tracking-widest mb-1">Every Period</div>
               <div className="space-y-1">
                 {variableItems.map(item => {
+                  const bill = billMap.get(item.billId)
+                  if (!bill) return null
+                  return (
+                    <div key={item.id} className="flex justify-between text-sm text-slate-400 py-1">
+                      <span>{bill.name}</span>
+                      <span className="tabular-nums">{formatCurrency(item.actualAmount ?? bill.amount)}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {savingsItems.length > 0 && (
+            <div className="px-4 pt-3">
+              <div className="text-xs text-slate-500 uppercase tracking-widest mb-1">Savings</div>
+              <div className="space-y-1">
+                {savingsItems.map(item => {
                   const bill = billMap.get(item.billId)
                   if (!bill) return null
                   return (
