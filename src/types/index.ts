@@ -77,6 +77,7 @@ export interface WealthAccount {
   balance: number
   balanceDate: string
   notes: string
+  includeInProjections: boolean
 }
 
 export interface ProjectionCalcAccount {

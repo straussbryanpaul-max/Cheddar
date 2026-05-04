@@ -276,21 +276,37 @@ export function ProjectionsTab() {
             <div className="text-center py-8 text-slate-500 text-sm">No accounts yet — add one below</div>
           )}
 
-          <div className="mt-3 flex gap-3 flex-wrap">
+          <div className="mt-3 space-y-2">
+            {/* Add from flagged accounts */}
+            {(() => {
+              const linkedIds = new Set(calcAccounts.map(c => c.linkedAccountId).filter(Boolean))
+              const available = wealthAccounts.filter(a => a.includeInProjections && !linkedIds.has(a.id))
+              return available.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {available.map(a => (
+                    <button
+                      key={a.id}
+                      onClick={() => addCalcAccount({ name: `${a.institution} ${a.name}`, linkedAccountId: a.id, presentValue: a.balance, annualRate: 0.07, annualContribution: 0, periodsPerYear: 1 })}
+                      className="flex items-center gap-1.5 text-xs bg-slate-700/60 hover:bg-slate-600 text-slate-300 rounded-lg px-3 py-1.5 transition-colors"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                      {a.institution} {a.name}
+                    </button>
+                  ))}
+                </div>
+              ) : null
+            })()}
             <button
               onClick={() => addCalcAccount({ name: '', linkedAccountId: null, presentValue: 0, annualRate: 0.07, annualContribution: 0, periodsPerYear: 1 })}
-              className="flex items-center gap-2 text-sm text-slate-500 hover:text-emerald-400 transition-colors py-2"
+              className="flex items-center gap-2 text-sm text-slate-500 hover:text-emerald-400 transition-colors py-1"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
               </svg>
-              Add account
+              Add manually
             </button>
-            {wealthAccounts.filter(a => a.category === 'retirement').length > 0 && (
-              <div className="text-xs text-slate-600 self-center">
-                Tip: link to an account above to auto-sync PV from your balances
-              </div>
-            )}
           </div>
         </div>
       </div>

@@ -106,6 +106,25 @@ const SEED_BILLS: Bill[] = [
   { id: 'b14', name: 'Misc',                  amount: 100, dueDayOfMonth: null, frequency: 'monthly', dueMonths: [], category: 'variable', active: true },
 ]
 
+const SEED_WEALTH_ACCOUNTS: WealthAccount[] = [
+  { id: 'wa1',  institution: 'Spec', name: 'Safety Net',         type: 'money_market',    category: 'emergency',  balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false },
+  { id: 'wa2',  institution: 'Spec', name: 'Travel',             type: 'money_market',    category: 'spending',   balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false },
+  { id: 'wa3',  institution: 'Spec', name: 'Emergency Repair',   type: 'money_market',    category: 'emergency',  balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false },
+  { id: 'wa4',  institution: 'Spec', name: 'Planned Updates',    type: 'money_market',    category: 'emergency',  balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false },
+  { id: 'wa5',  institution: 'Spec', name: 'Miscellaneous',      type: 'money_market',    category: 'spending',   balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false },
+  { id: 'wa6',  institution: 'Spec', name: 'Available to Invest',type: 'money_market',    category: 'investment', balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false },
+  { id: 'wa7',  institution: 'Spec', name: 'CD',                 type: 'cd',              category: 'spending',   balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false },
+  { id: 'wa8',  institution: 'Spec', name: 'Kids',               type: 'savings',         category: 'kids',       balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false },
+  { id: 'wa9',  institution: 'Wells',name: 'Savings',            type: 'savings',         category: 'emergency',  balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false },
+  { id: 'wa10', institution: 'Chuck',name: 'Rachel Roth',        type: 'roth_ira',        category: 'retirement', balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: true },
+  { id: 'wa11', institution: 'Chuck',name: 'Bryan Roth',         type: 'roth_ira',        category: 'retirement', balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: true },
+  { id: 'wa12', institution: 'Chuck',name: 'IRA',                type: 'traditional_ira', category: 'retirement', balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: true },
+  { id: 'wa13', institution: 'Chuck',name: 'Brokerage',          type: 'brokerage',       category: 'retirement', balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: true },
+  { id: 'wa14', institution: 'Company', name: 'Trust & Thrift',  type: '401k',            category: 'retirement', balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: true },
+  { id: 'wa15', institution: 'Public',  name: 'E-Account',       type: 'brokerage',       category: 'investment', balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false },
+  { id: 'wa16', institution: 'Texas College Savings', name: '529', type: '529',           category: 'college',    balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false },
+]
+
 const DEFAULT_PAY_AMOUNT = 6400
 const DEFAULT_PAY_ANCHOR = '2026-04-30'
 const DEFAULT_PAY_FREQ: PayFrequency = 'biweekly'
@@ -164,7 +183,7 @@ export const useStore = create<State>()(
       periodsWindowDate: null,
       periodActuals: [],
       anthropicApiKey: '',
-      wealthAccounts: [],
+      wealthAccounts: SEED_WEALTH_ACCOUNTS,
       projectionCalcAccounts: [],
       projectionSnapshots: [],
       retirementPlan: { expenses: [], socialSecurityAnnual: 0 },
@@ -406,7 +425,7 @@ export const useStore = create<State>()(
           payAnchorDate: p.payAnchorDate ?? c.payAnchorDate,
           periodsWindowDate: p.periodsWindowDate ?? null,
           periodActuals: p.periodActuals ?? [],
-          wealthAccounts: p.wealthAccounts ?? [],
+          wealthAccounts: p.wealthAccounts ?? c.wealthAccounts,
           projectionCalcAccounts: p.projectionCalcAccounts ?? [],
           projectionSnapshots: p.projectionSnapshots ?? [],
           retirementPlan: p.retirementPlan ?? c.retirementPlan,

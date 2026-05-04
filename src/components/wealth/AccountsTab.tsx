@@ -17,6 +17,7 @@ interface FormState {
   balance: string
   balanceDate: string
   notes: string
+  includeInProjections: boolean
 }
 
 function defaultForm(a?: WealthAccount): FormState {
@@ -28,6 +29,7 @@ function defaultForm(a?: WealthAccount): FormState {
     balance: a ? String(a.balance) : '',
     balanceDate: a?.balanceDate ?? today(),
     notes: a?.notes ?? '',
+    includeInProjections: a?.includeInProjections ?? false,
   }
 }
 
@@ -82,12 +84,23 @@ function AccountForm({ initial, onSave, onCancel }: {
           onChange={e => set({ balanceDate: e.target.value })}
         />
       </div>
-      <input
-        className={`${inputCls} w-full`}
-        placeholder="Notes (optional)"
-        value={form.notes}
-        onChange={e => set({ notes: e.target.value })}
-      />
+      <div className="flex items-center gap-3">
+        <input
+          className={`${inputCls} flex-1`}
+          placeholder="Notes (optional)"
+          value={form.notes}
+          onChange={e => set({ notes: e.target.value })}
+        />
+        <label className="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer flex-shrink-0">
+          <input
+            type="checkbox"
+            checked={form.includeInProjections}
+            onChange={e => set({ includeInProjections: e.target.checked })}
+            className="accent-blue-500"
+          />
+          Projections
+        </label>
+      </div>
       <div className="flex gap-2 justify-end">
         <button type="button" onClick={onCancel} className="text-sm text-slate-500 hover:text-slate-300 px-3 py-1">Cancel</button>
         <button type="submit" className="text-sm bg-emerald-600 hover:bg-emerald-500 text-white rounded px-3 py-1 font-medium">Save</button>
@@ -98,9 +111,17 @@ function AccountForm({ initial, onSave, onCancel }: {
 
 function AccountRow({ account, onEdit }: { account: WealthAccount; onEdit: () => void }) {
   const deleteWealthAccount = useStore(s => s.deleteWealthAccount)
+  const updateWealthAccount = useStore(s => s.updateWealthAccount)
   return (
     <div className="flex items-center justify-between py-2 px-3 rounded-lg group hover:bg-slate-700/30">
       <div className="flex items-center gap-3 min-w-0">
+        <input
+          type="checkbox"
+          checked={account.includeInProjections}
+          onChange={e => updateWealthAccount(account.id, { includeInProjections: e.target.checked })}
+          className="accent-blue-500 flex-shrink-0"
+          title="Include in projections calculator"
+        />
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm text-slate-200 font-medium">{account.name || account.institution}</span>
@@ -151,6 +172,7 @@ export function AccountsTab() {
       balance: isNaN(balance) ? 0 : balance,
       balanceDate: form.balanceDate,
       notes: form.notes.trim(),
+      includeInProjections: form.includeInProjections,
     }
     if (id) { updateWealthAccount(id, patch); setEditingId(null) }
     else { addWealthAccount(patch); setAdding(false) }
