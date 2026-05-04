@@ -320,17 +320,26 @@ export const useStore = create<State>()(
     }),
     {
       name: 'cheddar-store-v4',
-      merge: (persisted, current) => ({
-        ...current,
-        ...(persisted as Partial<State>),
-        quickLinks: (persisted as Partial<State>).quickLinks ?? (current as State).quickLinks,
-        periodsVisible: (persisted as Partial<State>).periodsVisible ?? (current as State).periodsVisible,
-        anthropicApiKey: (persisted as Partial<State>).anthropicApiKey ?? (current as State).anthropicApiKey,
-        payFrequency: (persisted as Partial<State>).payFrequency ?? (current as State).payFrequency,
-        payAnchorDate: (persisted as Partial<State>).payAnchorDate ?? (current as State).payAnchorDate,
-        periodsWindowDate: (persisted as Partial<State>).periodsWindowDate ?? null,
-        periodActuals: (persisted as Partial<State>).periodActuals ?? [],
-      }),
+      merge: (persisted, current) => {
+        const p = persisted as Partial<State>
+        const c = current as State
+        // Inject any seed bills missing from persisted data (e.g. added after first load)
+        const persistedBills = p.bills ?? []
+        const persistedIds = new Set(persistedBills.map(b => b.id))
+        const missingSeeds = SEED_BILLS.filter(b => !persistedIds.has(b.id))
+        return {
+          ...c,
+          ...p,
+          bills: [...persistedBills, ...missingSeeds],
+          quickLinks: p.quickLinks ?? c.quickLinks,
+          periodsVisible: p.periodsVisible ?? c.periodsVisible,
+          anthropicApiKey: p.anthropicApiKey ?? c.anthropicApiKey,
+          payFrequency: p.payFrequency ?? c.payFrequency,
+          payAnchorDate: p.payAnchorDate ?? c.payAnchorDate,
+          periodsWindowDate: p.periodsWindowDate ?? null,
+          periodActuals: p.periodActuals ?? [],
+        }
+      },
     }
   )
 )

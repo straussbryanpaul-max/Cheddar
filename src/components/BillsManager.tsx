@@ -352,8 +352,28 @@ export function BillsManager() {
   return (
     <div className="bg-slate-800 rounded-2xl overflow-hidden shadow-2xl">
       <div className="bg-slate-700/50 px-6 py-4">
-        <h2 className="text-white font-semibold text-lg">Bills & Recurring Items</h2>
-        <p className="text-slate-400 text-sm mt-0.5">Changes propagate to all periods automatically.</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-white font-semibold text-lg">Bills & Recurring Items</h2>
+            <p className="text-slate-400 text-sm mt-0.5">Changes propagate to all periods automatically.</p>
+          </div>
+          {confirmReset ? (
+            <div className="bg-red-900/40 border border-red-700/50 rounded-lg p-3 text-sm ml-4">
+              <p className="text-red-300 mb-2 text-xs">Reset everything — all bills, periods, and history — back to defaults?</p>
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setConfirmReset(false)} className="text-slate-400 hover:text-slate-200 px-3 py-1 text-xs">Cancel</button>
+                <button onClick={() => { resetStore(); setConfirmReset(false) }} className="bg-red-600 hover:bg-red-500 text-white rounded px-3 py-1 text-xs font-medium">Reset Everything</button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmReset(true)}
+              className="text-xs text-slate-500 hover:text-red-400 transition-colors mt-1 flex-shrink-0"
+            >
+              Reset to defaults
+            </button>
+          )}
+        </div>
       </div>
 
       <Section title="Fixed Bills" items={fixed} />
@@ -382,25 +402,6 @@ export function BillsManager() {
 
       <div className="border-t border-slate-700/40 mt-2">
         <PaySettings />
-      </div>
-
-      <div className="border-t border-slate-700/40 px-4 py-4">
-        {confirmReset ? (
-          <div className="bg-red-900/30 border border-red-700/40 rounded-lg p-3 text-sm">
-            <p className="text-red-300 mb-2">This will reset everything — all bills, periods, and history — back to defaults. Cannot be undone.</p>
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setConfirmReset(false)} className="text-slate-400 hover:text-slate-200 px-3 py-1 text-xs">Cancel</button>
-              <button onClick={() => { resetStore(); setConfirmReset(false) }} className="bg-red-600 hover:bg-red-500 text-white rounded px-3 py-1 text-xs font-medium">Reset Everything</button>
-            </div>
-          </div>
-        ) : (
-          <button
-            onClick={() => setConfirmReset(true)}
-            className="text-xs text-slate-500 hover:text-red-400 transition-colors"
-          >
-            Reset to defaults
-          </button>
-        )}
       </div>
     </div>
   )
