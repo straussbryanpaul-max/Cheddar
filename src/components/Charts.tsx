@@ -51,26 +51,23 @@ function buildSavingsData(
   bills: Bill[],
 ) {
   const billMap = new Map(bills.map(b => [b.id, b]))
-  const projectedOpenings = buildProjectedOpenings(periods, allItems, allExtras, bills)
 
-  // Group by month — keep only the LAST period in each month (end-of-month position)
+  // Sum net per-period surplus (payAmount − bills − extras) grouped by calendar month
   const byMonth = new Map<string, { label: string; forecast: number }>()
 
   for (const period of periods) {
-    const opening = projectedOpenings.get(period.id) ?? null
-    if (opening === null) continue
-
-    const effectivePeriod = { ...period, openingBalance: opening }
     const items = allItems.filter(i => i.periodId === period.id && !i.dismissed && billMap.get(i.billId)?.active)
     const extras = allExtras.filter(e => e.periodId === period.id)
-    const forecast = calcForecast(effectivePeriod, items, bills, extras)
-    if (forecast === null) continue
+
+    const billTotal = items.reduce((s, i) => s + (i.actualAmount ?? billMap.get(i.billId)?.amount ?? 0), 0)
+    const extraTotal = extras.reduce((s, e) => s + e.amount, 0)
+    const net = period.payAmount - billTotal - extraTotal
 
     const d = new Date(period.startDate + 'T00:00:00')
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
     const label = `${MONTH_NAMES[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`
-    // Last period in this month wins
-    byMonth.set(key, { label, forecast: Math.round(forecast) })
+    const existing = byMonth.get(key)
+    byMonth.set(key, { label, forecast: Math.round((existing?.forecast ?? 0) + net) })
   }
 
   return Array.from(byMonth.values())

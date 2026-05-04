@@ -3,18 +3,18 @@ import { useStore } from './store'
 import { CurrentPeriod } from './components/CurrentPeriod'
 import { UpcomingPeriod } from './components/UpcomingPeriod'
 import { BillsManager } from './components/BillsManager'
+import { WealthModule } from './components/WealthModule'
 import { QuickLinks } from './components/QuickLinks'
 import { Charts } from './components/Charts'
 import { StatementPanel } from './components/StatementPanel'
 import { formatDate, periodEndDate, buildProjectedOpenings } from './lib/periods'
 
-type Module = 'budget' | 'savings' | 'college' | 'retirement' | 'bills'
+type Module = 'budget' | 'savings' | 'college' | 'bills'
 
 const MODULES: { id: Module; label: string; soon?: boolean }[] = [
-  { id: 'budget',     label: 'Budget' },
-  { id: 'savings',    label: 'Savings',    soon: true },
-  { id: 'college',    label: 'College',    soon: true },
-  { id: 'retirement', label: 'Retirement', soon: true },
+  { id: 'budget',  label: 'Budget' },
+  { id: 'savings', label: 'Savings & Retirement' },
+  { id: 'college', label: 'College', soon: true },
 ]
 
 const GRID_COLS: Record<number, string> = {
@@ -150,10 +150,9 @@ export default function App() {
 
       <div className="max-w-7xl mx-auto px-4 py-6 flex gap-4 items-start">
         <main className="flex-1 min-w-0">
-          {module === 'bills'      && <BillsManager />}
-          {module === 'savings'    && <ComingSoon label="Savings" />}
-          {module === 'college'    && <ComingSoon label="College" />}
-          {module === 'retirement' && <ComingSoon label="Retirement" />}
+          {module === 'bills'   && <BillsManager />}
+          {module === 'savings' && <WealthModule />}
+          {module === 'college' && <ComingSoon label="College" />}
 
           {module === 'budget' && (
             <>

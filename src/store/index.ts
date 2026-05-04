@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry } from '../types'
+import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan } from '../types'
 import { nextPeriodStart, prevPeriodStart, billIncludedInPeriod } from '../lib/periods'
 
 interface State {
@@ -50,6 +50,29 @@ interface State {
 
   resetStore: () => void
   resetPeriod: (periodId: string) => void
+
+  // Wealth module
+  wealthAccounts: WealthAccount[]
+  projectionCalcAccounts: ProjectionCalcAccount[]
+  projectionSnapshots: ProjectionSnapshot[]
+  retirementPlan: RetirementPlan
+
+  addWealthAccount: (a: Omit<WealthAccount, 'id'>) => void
+  updateWealthAccount: (id: string, updates: Partial<WealthAccount>) => void
+  deleteWealthAccount: (id: string) => void
+
+  addCalcAccount: (a: Omit<ProjectionCalcAccount, 'id'>) => void
+  updateCalcAccount: (id: string, updates: Partial<ProjectionCalcAccount>) => void
+  deleteCalcAccount: (id: string) => void
+
+  addSnapshot: (s: Omit<ProjectionSnapshot, 'id'>) => void
+  updateSnapshotMilestone: (snapshotId: string, milestoneLabel: string, updates: Pick<SnapshotMilestone, 'actual' | 'actualDate'>) => void
+  deleteSnapshot: (id: string) => void
+
+  updateRetirementPlan: (updates: Partial<RetirementPlan>) => void
+  addRetirementExpense: (e: Omit<RetirementExpense, 'id'>) => void
+  updateRetirementExpense: (id: string, updates: Partial<RetirementExpense>) => void
+  deleteRetirementExpense: (id: string) => void
 }
 
 function uid() {
@@ -141,6 +164,10 @@ export const useStore = create<State>()(
       periodsWindowDate: null,
       periodActuals: [],
       anthropicApiKey: '',
+      wealthAccounts: [],
+      projectionCalcAccounts: [],
+      projectionSnapshots: [],
+      retirementPlan: { expenses: [], socialSecurityAnnual: 0 },
 
       setPaySettings: (s) => {
         set(state => ({
@@ -304,6 +331,10 @@ export const useStore = create<State>()(
           periodsVisible: 2,
           periodsWindowDate: null,
           periodActuals: [],
+          wealthAccounts: [],
+          projectionCalcAccounts: [],
+          projectionSnapshots: [],
+          retirementPlan: { expenses: [], socialSecurityAnnual: 0 },
         }),
 
       resetPeriod: (periodId) =>
@@ -317,6 +348,48 @@ export const useStore = create<State>()(
             p.id === periodId ? { ...p, openingBalance: null, payAmount: s.defaultPayAmount } : p
           ),
         })),
+
+      addWealthAccount: (a) =>
+        set(s => ({ wealthAccounts: [...s.wealthAccounts, { ...a, id: uid() }] })),
+      updateWealthAccount: (id, updates) =>
+        set(s => ({ wealthAccounts: s.wealthAccounts.map(a => a.id === id ? { ...a, ...updates } : a) })),
+      deleteWealthAccount: (id) =>
+        set(s => ({
+          wealthAccounts: s.wealthAccounts.filter(a => a.id !== id),
+          projectionCalcAccounts: s.projectionCalcAccounts.map(c =>
+            c.linkedAccountId === id ? { ...c, linkedAccountId: null } : c
+          ),
+        })),
+
+      addCalcAccount: (a) =>
+        set(s => ({ projectionCalcAccounts: [...s.projectionCalcAccounts, { ...a, id: uid() }] })),
+      updateCalcAccount: (id, updates) =>
+        set(s => ({ projectionCalcAccounts: s.projectionCalcAccounts.map(c => c.id === id ? { ...c, ...updates } : c) })),
+      deleteCalcAccount: (id) =>
+        set(s => ({ projectionCalcAccounts: s.projectionCalcAccounts.filter(c => c.id !== id) })),
+
+      addSnapshot: (snap) =>
+        set(s => ({ projectionSnapshots: [...s.projectionSnapshots, { ...snap, id: uid() }] })),
+      updateSnapshotMilestone: (snapshotId, milestoneLabel, updates) =>
+        set(s => ({
+          projectionSnapshots: s.projectionSnapshots.map(sn =>
+            sn.id !== snapshotId ? sn : {
+              ...sn,
+              milestones: sn.milestones.map(m => m.label === milestoneLabel ? { ...m, ...updates } : m),
+            }
+          ),
+        })),
+      deleteSnapshot: (id) =>
+        set(s => ({ projectionSnapshots: s.projectionSnapshots.filter(sn => sn.id !== id) })),
+
+      updateRetirementPlan: (updates) =>
+        set(s => ({ retirementPlan: { ...s.retirementPlan, ...updates } })),
+      addRetirementExpense: (e) =>
+        set(s => ({ retirementPlan: { ...s.retirementPlan, expenses: [...s.retirementPlan.expenses, { ...e, id: uid() }] } })),
+      updateRetirementExpense: (id, updates) =>
+        set(s => ({ retirementPlan: { ...s.retirementPlan, expenses: s.retirementPlan.expenses.map(e => e.id === id ? { ...e, ...updates } : e) } })),
+      deleteRetirementExpense: (id) =>
+        set(s => ({ retirementPlan: { ...s.retirementPlan, expenses: s.retirementPlan.expenses.filter(e => e.id !== id) } })),
     }),
     {
       name: 'cheddar-store-v4',
@@ -333,6 +406,10 @@ export const useStore = create<State>()(
           payAnchorDate: p.payAnchorDate ?? c.payAnchorDate,
           periodsWindowDate: p.periodsWindowDate ?? null,
           periodActuals: p.periodActuals ?? [],
+          wealthAccounts: p.wealthAccounts ?? [],
+          projectionCalcAccounts: p.projectionCalcAccounts ?? [],
+          projectionSnapshots: p.projectionSnapshots ?? [],
+          retirementPlan: p.retirementPlan ?? c.retirementPlan,
         }
       },
     }

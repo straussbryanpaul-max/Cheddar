@@ -57,3 +57,62 @@ export interface PeriodActuals {
   statementRange: string   // e.g. "Apr 30 – May 13"
   entries: ActualEntry[]
 }
+
+// ─── Wealth / Savings & Retirement ───────────────────────────────────────────
+
+export type AccountType =
+  | 'checking' | 'savings' | 'money_market' | 'cd'
+  | 'roth_ira' | 'traditional_ira' | '401k' | '403b'
+  | 'brokerage' | '529' | 'hsa' | 'other'
+
+export type AccountCategory =
+  | 'emergency' | 'retirement' | 'college' | 'investment' | 'spending' | 'kids' | 'other'
+
+export interface WealthAccount {
+  id: string
+  institution: string
+  name: string
+  type: AccountType
+  category: AccountCategory
+  balance: number
+  balanceDate: string
+  notes: string
+}
+
+export interface ProjectionCalcAccount {
+  id: string
+  name: string
+  linkedAccountId: string | null
+  presentValue: number
+  annualRate: number
+  annualContribution: number
+  periodsPerYear: number
+}
+
+export type SnapshotMilestoneLabel = 'Today' | '1yr' | '3yr' | '5yr' | '10yr' | '15yr' | '20yr'
+
+export interface SnapshotMilestone {
+  label: SnapshotMilestoneLabel
+  targetDate: string
+  projected: number
+  actual: number | null
+  actualDate: string | null
+}
+
+export interface ProjectionSnapshot {
+  id: string
+  name: string
+  snapshotDate: string
+  milestones: SnapshotMilestone[]
+}
+
+export interface RetirementExpense {
+  id: string
+  name: string
+  monthlyAmount: number
+}
+
+export interface RetirementPlan {
+  expenses: RetirementExpense[]
+  socialSecurityAnnual: number
+}
