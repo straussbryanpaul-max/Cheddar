@@ -323,14 +323,9 @@ export const useStore = create<State>()(
       merge: (persisted, current) => {
         const p = persisted as Partial<State>
         const c = current as State
-        // Inject any seed bills missing from persisted data (e.g. added after first load)
-        const persistedBills = p.bills ?? []
-        const persistedIds = new Set(persistedBills.map(b => b.id))
-        const missingSeeds = SEED_BILLS.filter(b => !persistedIds.has(b.id))
         return {
           ...c,
           ...p,
-          bills: [...persistedBills, ...missingSeeds],
           quickLinks: p.quickLinks ?? c.quickLinks,
           periodsVisible: p.periodsVisible ?? c.periodsVisible,
           anthropicApiKey: p.anthropicApiKey ?? c.anthropicApiKey,
