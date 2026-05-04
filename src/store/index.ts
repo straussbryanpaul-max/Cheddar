@@ -72,7 +72,12 @@ const SEED_BILLS: Bill[] = [
   { id: 'b6', name: 'Life Insurance - R', amount: 20,   dueDayOfMonth: 20, frequency: 'monthly', dueMonths: [], category: 'fixed',   active: true },
   { id: 'b7', name: 'YMCA',               amount: 51,   dueDayOfMonth: 2,  frequency: 'monthly', dueMonths: [], category: 'fixed',   active: true },
   { id: 'b8', name: 'Planet Fit',         amount: 46,   dueDayOfMonth: 17, frequency: 'monthly', dueMonths: [], category: 'fixed',   active: true },
-  { id: 'b9', name: 'Kids Savings',       amount: 200,  dueDayOfMonth: null, frequency: 'monthly', dueMonths: [], category: 'savings', active: true },
+  { id: 'b9',  name: 'Kids Savings',          amount: 200, dueDayOfMonth: null, frequency: 'monthly', dueMonths: [], category: 'savings',  active: true },
+  { id: 'b10', name: 'Individual Allowance',  amount: 100, dueDayOfMonth: null, frequency: 'monthly', dueMonths: [], category: 'variable', active: true },
+  { id: 'b11', name: 'Groceries',             amount: 400, dueDayOfMonth: null, frequency: 'monthly', dueMonths: [], category: 'variable', active: true },
+  { id: 'b12', name: 'Gas',                   amount: 50,  dueDayOfMonth: null, frequency: 'monthly', dueMonths: [], category: 'variable', active: true },
+  { id: 'b13', name: 'Meals Out',             amount: 100, dueDayOfMonth: null, frequency: 'monthly', dueMonths: [], category: 'variable', active: true },
+  { id: 'b14', name: 'Misc',                  amount: 100, dueDayOfMonth: null, frequency: 'monthly', dueMonths: [], category: 'variable', active: true },
 ]
 
 const DEFAULT_PAY_AMOUNT = 6400
