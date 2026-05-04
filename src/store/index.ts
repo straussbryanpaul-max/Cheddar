@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan } from '../types'
+import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, AccountAdjustment, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan } from '../types'
 import { nextPeriodStart, prevPeriodStart, billIncludedInPeriod } from '../lib/periods'
 
 interface State {
@@ -60,6 +60,11 @@ interface State {
   addWealthAccount: (a: Omit<WealthAccount, 'id'>) => void
   updateWealthAccount: (id: string, updates: Partial<WealthAccount>) => void
   deleteWealthAccount: (id: string) => void
+
+  accountAdjustments: AccountAdjustment[]
+  addAccountAdjustment: (a: Omit<AccountAdjustment, 'id'>) => void
+  updateAccountAdjustment: (id: string, updates: Partial<AccountAdjustment>) => void
+  deleteAccountAdjustment: (id: string) => void
 
   addCalcAccount: (a: Omit<ProjectionCalcAccount, 'id'>) => void
   updateCalcAccount: (id: string, updates: Partial<ProjectionCalcAccount>) => void
@@ -184,6 +189,7 @@ export const useStore = create<State>()(
       periodActuals: [],
       anthropicApiKey: '',
       wealthAccounts: SEED_WEALTH_ACCOUNTS,
+      accountAdjustments: [],
       projectionCalcAccounts: [],
       projectionSnapshots: [],
       retirementPlan: { expenses: [], socialSecurityAnnual: 0 },
@@ -375,10 +381,18 @@ export const useStore = create<State>()(
       deleteWealthAccount: (id) =>
         set(s => ({
           wealthAccounts: s.wealthAccounts.filter(a => a.id !== id),
+          accountAdjustments: s.accountAdjustments.filter(a => a.accountId !== id),
           projectionCalcAccounts: s.projectionCalcAccounts.map(c =>
             c.linkedAccountId === id ? { ...c, linkedAccountId: null } : c
           ),
         })),
+
+      addAccountAdjustment: (a) =>
+        set(s => ({ accountAdjustments: [...s.accountAdjustments, { ...a, id: uid() }] })),
+      updateAccountAdjustment: (id, updates) =>
+        set(s => ({ accountAdjustments: s.accountAdjustments.map(a => a.id === id ? { ...a, ...updates } : a) })),
+      deleteAccountAdjustment: (id) =>
+        set(s => ({ accountAdjustments: s.accountAdjustments.filter(a => a.id !== id) })),
 
       addCalcAccount: (a) =>
         set(s => ({ projectionCalcAccounts: [...s.projectionCalcAccounts, { ...a, id: uid() }] })),
@@ -425,7 +439,8 @@ export const useStore = create<State>()(
           payAnchorDate: p.payAnchorDate ?? c.payAnchorDate,
           periodsWindowDate: p.periodsWindowDate ?? null,
           periodActuals: p.periodActuals ?? [],
-          wealthAccounts: p.wealthAccounts ?? c.wealthAccounts,
+          wealthAccounts: (p.wealthAccounts && p.wealthAccounts.length > 0) ? p.wealthAccounts : c.wealthAccounts,
+          accountAdjustments: p.accountAdjustments ?? [],
           projectionCalcAccounts: p.projectionCalcAccounts ?? [],
           projectionSnapshots: p.projectionSnapshots ?? [],
           retirementPlan: p.retirementPlan ?? c.retirementPlan,

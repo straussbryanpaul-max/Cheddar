@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useStore } from '../../store'
 import { formatCurrency } from '../../lib/periods'
 import { ACCOUNT_TYPE_LABELS, ACCOUNT_CATEGORY_LABELS, CATEGORY_ORDER } from '../../lib/wealth'
-import type { WealthAccount, AccountType, AccountCategory } from '../../types'
+import type { WealthAccount, AccountType, AccountCategory, AccountAdjustment, AccountAdjustmentType } from '../../types'
 
 const inputCls = 'bg-slate-700 text-white text-sm rounded px-2 py-1 border border-slate-600 outline-none focus:border-blue-400'
 const selectCls = 'bg-slate-700 text-white text-sm rounded px-2 py-1 border border-slate-600 outline-none focus:border-blue-400'
@@ -109,45 +109,25 @@ function AccountForm({ initial, onSave, onCancel }: {
   )
 }
 
-function AccountRow({ account, onEdit }: { account: WealthAccount; onEdit: () => void }) {
-  const deleteWealthAccount = useStore(s => s.deleteWealthAccount)
-  const updateWealthAccount = useStore(s => s.updateWealthAccount)
+function AdjustmentRow({ adj }: { adj: AccountAdjustment }) {
+  const deleteAccountAdjustment = useStore(s => s.deleteAccountAdjustment)
+  const isPositive = adj.amount >= 0
   return (
-    <div className="flex items-center justify-between py-2 px-3 rounded-lg group hover:bg-slate-700/30">
-      <div className="flex items-center gap-3 min-w-0">
-        <input
-          type="checkbox"
-          checked={account.includeInProjections}
-          onChange={e => updateWealthAccount(account.id, { includeInProjections: e.target.checked })}
-          className="accent-blue-500 flex-shrink-0"
-          title="Include in projections calculator"
-        />
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-200 font-medium">{account.name || account.institution}</span>
-            {account.name && account.institution && (
-              <span className="text-xs text-slate-500">{account.institution}</span>
-            )}
-            <span className="text-xs bg-slate-700 text-slate-400 rounded px-1.5 py-0.5 hidden sm:inline">
-              {ACCOUNT_TYPE_LABELS[account.type] ?? account.type}
-            </span>
-          </div>
-          {account.notes && <div className="text-xs text-slate-500 truncate max-w-xs">{account.notes}</div>}
-        </div>
+    <div className="flex items-center justify-between py-1 px-2 rounded group hover:bg-slate-700/20 text-xs">
+      <div className="flex items-center gap-2">
+        <span className={`w-12 text-center rounded px-1 py-0.5 font-medium ${adj.type === 'actual' ? 'bg-emerald-900/50 text-emerald-400' : 'bg-blue-900/50 text-blue-400'}`}>
+          {adj.type}
+        </span>
+        <span className="text-slate-300">{adj.label}</span>
+        <span className="text-slate-500">{adj.date}</span>
       </div>
-      <div className="flex items-center gap-3 flex-shrink-0">
-        <div className="text-right">
-          <div className="text-sm font-medium text-emerald-300 tabular-nums">{formatCurrency(account.balance)}</div>
-          <div className="text-xs text-slate-500">{account.balanceDate}</div>
-        </div>
-        <button onClick={onEdit} className="text-slate-600 hover:text-blue-400 transition-colors opacity-0 group-hover:opacity-100">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z" />
-          </svg>
-        </button>
-        <button onClick={() => deleteWealthAccount(account.id)} className="text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+      <div className="flex items-center gap-2">
+        <span className={`tabular-nums font-medium ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+          {isPositive ? '+' : ''}{formatCurrency(adj.amount)}
+        </span>
+        <button onClick={() => deleteAccountAdjustment(adj.id)} className="text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-colors">
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
@@ -155,8 +135,148 @@ function AccountRow({ account, onEdit }: { account: WealthAccount; onEdit: () =>
   )
 }
 
+function AddAdjustmentForm({ accountId, onDone }: { accountId: string; onDone: () => void }) {
+  const addAccountAdjustment = useStore(s => s.addAccountAdjustment)
+  const [type, setType] = useState<AccountAdjustmentType>('actual')
+  const [label, setLabel] = useState('')
+  const [amount, setAmount] = useState('')
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault()
+    const amt = parseFloat(amount)
+    if (isNaN(amt) || !label.trim()) return
+    addAccountAdjustment({ accountId, type, label: label.trim(), amount: amt, date })
+    setLabel(''); setAmount('')
+    onDone()
+  }
+
+  return (
+    <form onSubmit={submit} className="flex items-center gap-2 flex-wrap px-2 py-2 bg-slate-700/20 rounded-lg mt-1">
+      <select
+        className="bg-slate-700 text-white text-xs rounded px-2 py-1 border border-slate-600 outline-none focus:border-blue-400"
+        value={type}
+        onChange={e => setType(e.target.value as AccountAdjustmentType)}
+      >
+        <option value="actual">Actual</option>
+        <option value="forecast">Forecast</option>
+      </select>
+      <input
+        autoFocus
+        className="bg-slate-700 text-white text-xs rounded px-2 py-1 border border-slate-600 outline-none focus:border-blue-400 flex-1 min-w-24"
+        placeholder="Label"
+        value={label}
+        onChange={e => setLabel(e.target.value)}
+      />
+      <input
+        className="bg-slate-700 text-white text-xs rounded px-2 py-1 border border-slate-600 outline-none focus:border-blue-400 w-28 text-right"
+        placeholder="+500 or -200"
+        value={amount}
+        onChange={e => setAmount(e.target.value)}
+      />
+      <input
+        type="date"
+        className="bg-slate-700 text-white text-xs rounded px-2 py-1 border border-slate-600 outline-none focus:border-blue-400"
+        value={date}
+        onChange={e => setDate(e.target.value)}
+      />
+      <button type="button" onClick={onDone} className="text-xs text-slate-500 hover:text-slate-300 px-2">Cancel</button>
+      <button type="submit" className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded px-3 py-1 font-medium">Add</button>
+    </form>
+  )
+}
+
+function AccountRow({ account, onEdit, adjustments }: { account: WealthAccount; onEdit: () => void; adjustments: AccountAdjustment[] }) {
+  const deleteWealthAccount = useStore(s => s.deleteWealthAccount)
+  const updateWealthAccount = useStore(s => s.updateWealthAccount)
+  const [expanded, setExpanded] = useState(false)
+  const [addingAdj, setAddingAdj] = useState(false)
+
+  const actualNet = adjustments.filter(a => a.type === 'actual').reduce((s, a) => s + a.amount, 0)
+  const forecastNet = adjustments.filter(a => a.type === 'forecast').reduce((s, a) => s + a.amount, 0)
+  const adjustedBalance = account.balance + actualNet
+  const projectedBalance = adjustedBalance + forecastNet
+  const hasAdjustments = adjustments.length > 0
+
+  return (
+    <div className="rounded-lg overflow-hidden">
+      <div className="flex items-center justify-between py-2 px-3 group hover:bg-slate-700/30">
+        <div className="flex items-center gap-3 min-w-0">
+          <input
+            type="checkbox"
+            checked={account.includeInProjections}
+            onChange={e => updateWealthAccount(account.id, { includeInProjections: e.target.checked })}
+            className="accent-blue-500 flex-shrink-0"
+            title="Include in projections calculator"
+          />
+          <button onClick={() => setExpanded(e => !e)} className="flex items-center gap-2 min-w-0 text-left">
+            <svg className={`w-3 h-3 text-slate-500 flex-shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-200 font-medium">{account.name || account.institution}</span>
+                {account.name && account.institution && (
+                  <span className="text-xs text-slate-500">{account.institution}</span>
+                )}
+                <span className="text-xs bg-slate-700 text-slate-400 rounded px-1.5 py-0.5 hidden sm:inline">
+                  {ACCOUNT_TYPE_LABELS[account.type] ?? account.type}
+                </span>
+              </div>
+              {account.notes && <div className="text-xs text-slate-500 truncate max-w-xs">{account.notes}</div>}
+            </div>
+          </button>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="text-right">
+            <div className="text-sm font-medium text-emerald-300 tabular-nums">{formatCurrency(account.balance)}</div>
+            {hasAdjustments && (
+              <div className="text-xs text-slate-400 tabular-nums">
+                adj: {formatCurrency(adjustedBalance)}
+                {forecastNet !== 0 && <span className="text-blue-400 ml-1">→ {formatCurrency(projectedBalance)}</span>}
+              </div>
+            )}
+            <div className="text-xs text-slate-500">{account.balanceDate}</div>
+          </div>
+          <button onClick={onEdit} className="text-slate-600 hover:text-blue-400 transition-colors opacity-0 group-hover:opacity-100">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z" />
+            </svg>
+          </button>
+          <button onClick={() => deleteWealthAccount(account.id)} className="text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="px-4 pb-2 space-y-0.5">
+          {adjustments.map(adj => <AdjustmentRow key={adj.id} adj={adj} />)}
+          {addingAdj
+            ? <AddAdjustmentForm accountId={account.id} onDone={() => setAddingAdj(false)} />
+            : (
+              <button
+                onClick={() => setAddingAdj(true)}
+                className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-emerald-400 transition-colors py-1 px-2"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                Add adjustment
+              </button>
+            )
+          }
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function AccountsTab() {
   const accounts = useStore(s => s.wealthAccounts)
+  const allAdjustments = useStore(s => s.accountAdjustments)
   const addWealthAccount = useStore(s => s.addWealthAccount)
   const updateWealthAccount = useStore(s => s.updateWealthAccount)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -229,7 +349,7 @@ export function AccountsTab() {
                     onCancel={() => setEditingId(null)}
                   />
                 ) : (
-                  <AccountRow key={a.id} account={a} onEdit={() => setEditingId(a.id)} />
+                  <AccountRow key={a.id} account={a} onEdit={() => setEditingId(a.id)} adjustments={allAdjustments.filter(adj => adj.accountId === a.id)} />
                 )
               )}
             </div>

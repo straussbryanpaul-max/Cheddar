@@ -80,6 +80,17 @@ export interface WealthAccount {
   includeInProjections: boolean
 }
 
+export type AccountAdjustmentType = 'actual' | 'forecast'
+
+export interface AccountAdjustment {
+  id: string
+  accountId: string
+  type: AccountAdjustmentType
+  amount: number   // positive = addition, negative = subtraction
+  label: string
+  date: string
+}
+
 export interface ProjectionCalcAccount {
   id: string
   name: string
