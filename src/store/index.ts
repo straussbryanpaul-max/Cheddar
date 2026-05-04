@@ -64,19 +64,15 @@ const SEED_QUICK_LINKS: QuickLink[] = [
 ]
 
 const SEED_BILLS: Bill[] = [
-  { id: 'b1',  name: 'Mortgage',             amount: 2919, dueDayOfMonth: 6,    frequency: 'monthly', dueMonths: [], category: 'fixed',    active: true },
-  { id: 'b2',  name: 'Credit Card',          amount: 4000, dueDayOfMonth: 14,   frequency: 'monthly', dueMonths: [], category: 'fixed',    active: true },
-  { id: 'b3',  name: 'Auto Loan',            amount: 642,  dueDayOfMonth: 4,    frequency: 'monthly', dueMonths: [], category: 'fixed',    active: true },
-  { id: 'b4',  name: 'Gas Bill',             amount: 200,  dueDayOfMonth: 6,    frequency: 'monthly', dueMonths: [], category: 'fixed',    active: true },
-  { id: 'b5',  name: 'Cleaning Lady',        amount: 180,  dueDayOfMonth: 15,   frequency: 'monthly', dueMonths: [], category: 'fixed',    active: true },
-  { id: 'b6',  name: 'Life Insurance - B',   amount: 136,  dueDayOfMonth: 14,   frequency: 'monthly', dueMonths: [], category: 'fixed',    active: true },
-  { id: 'b7',  name: 'Life Insurance - R',   amount: 20,   dueDayOfMonth: 20,   frequency: 'monthly', dueMonths: [], category: 'fixed',    active: true },
-  { id: 'b8',  name: 'Kids Savings',         amount: 200,  dueDayOfMonth: null, frequency: 'monthly', dueMonths: [], category: 'variable', active: true },
-  { id: 'b9',  name: 'Individual Allowance', amount: 50,   dueDayOfMonth: null, frequency: 'monthly', dueMonths: [], category: 'variable', active: true },
-  { id: 'b10', name: 'Groceries',            amount: 150,  dueDayOfMonth: null, frequency: 'monthly', dueMonths: [], category: 'variable', active: true },
-  { id: 'b11', name: 'Gas',                  amount: 50,   dueDayOfMonth: null, frequency: 'monthly', dueMonths: [], category: 'variable', active: true },
-  { id: 'b12', name: 'Meals Out',            amount: 100,  dueDayOfMonth: null, frequency: 'monthly', dueMonths: [], category: 'variable', active: true },
-  { id: 'b13', name: 'Misc',                 amount: 50,   dueDayOfMonth: null, frequency: 'monthly', dueMonths: [], category: 'variable', active: true },
+  { id: 'b1', name: 'Mortgage',           amount: 2919, dueDayOfMonth: 6,  frequency: 'monthly', dueMonths: [], category: 'fixed',   active: true },
+  { id: 'b2', name: 'Credit Card',        amount: 4500, dueDayOfMonth: 14, frequency: 'monthly', dueMonths: [], category: 'fixed',   active: true },
+  { id: 'b3', name: 'Auto Loan',          amount: 526,  dueDayOfMonth: 4,  frequency: 'monthly', dueMonths: [], category: 'fixed',   active: true },
+  { id: 'b4', name: 'Gas Bill',           amount: 200,  dueDayOfMonth: 6,  frequency: 'monthly', dueMonths: [], category: 'fixed',   active: true },
+  { id: 'b5', name: 'Life Insurance - B', amount: 136,  dueDayOfMonth: 14, frequency: 'monthly', dueMonths: [], category: 'fixed',   active: true },
+  { id: 'b6', name: 'Life Insurance - R', amount: 20,   dueDayOfMonth: 20, frequency: 'monthly', dueMonths: [], category: 'fixed',   active: true },
+  { id: 'b7', name: 'YMCA',               amount: 51,   dueDayOfMonth: 2,  frequency: 'monthly', dueMonths: [], category: 'fixed',   active: true },
+  { id: 'b8', name: 'Planet Fit',         amount: 46,   dueDayOfMonth: 17, frequency: 'monthly', dueMonths: [], category: 'fixed',   active: true },
+  { id: 'b9', name: 'Kids Savings',       amount: 200,  dueDayOfMonth: null, frequency: 'monthly', dueMonths: [], category: 'savings', active: true },
 ]
 
 const DEFAULT_PAY_AMOUNT = 6400
@@ -289,7 +285,7 @@ export const useStore = create<State>()(
         set(s => ({ periodActuals: s.periodActuals.filter(a => a.periodId !== periodId) })),
     }),
     {
-      name: 'cheddar-store-v3',
+      name: 'cheddar-store-v4',
       merge: (persisted, current) => ({
         ...current,
         ...(persisted as Partial<State>),
