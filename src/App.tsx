@@ -47,8 +47,10 @@ export default function App() {
   const bills = useStore(s => s.bills)
   const allItems = useStore(s => s.periodItems)
   const allExtras = useStore(s => s.extras)
+  const regeneratePeriods = useStore(s => s.regeneratePeriods)
   const [module, setModule] = useState<Module>('budget')
   const [showStatement, setShowStatement] = useState(false)
+  const [confirmReset, setConfirmReset] = useState(false)
 
   useEffect(() => {
     ensurePastPeriods(8)
@@ -196,6 +198,20 @@ export default function App() {
 
                 {/* Right controls */}
                 <div className="flex items-center gap-2">
+                  {confirmReset ? (
+                    <div className="flex items-center gap-2 bg-red-900/30 border border-red-700/40 rounded-lg px-3 py-1.5">
+                      <span className="text-xs text-red-300">Reset all periods?</span>
+                      <button onClick={() => setConfirmReset(false)} className="text-xs text-slate-400 hover:text-slate-200">Cancel</button>
+                      <button onClick={() => { regeneratePeriods(); setConfirmReset(false) }} className="text-xs bg-red-600 hover:bg-red-500 text-white rounded px-2 py-0.5 font-medium">Reset</button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmReset(true)}
+                      className="text-xs text-slate-600 hover:text-red-400 transition-colors"
+                    >
+                      Reset
+                    </button>
+                  )}
                   <button
                     onClick={() => setShowStatement(true)}
                     className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 border border-slate-700/50 hover:border-slate-600 rounded-lg px-3 py-1.5 transition-colors"
@@ -229,6 +245,7 @@ export default function App() {
                   <CurrentPeriod
                     key={p.id}
                     periodId={p.id}
+                    projectedOpening={projectedOpenings.get(p.id) ?? null}
                     label={periodLabel(i)}
                   />
                 ))}

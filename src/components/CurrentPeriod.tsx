@@ -7,13 +7,13 @@ import { AddExtraForm } from './AddExtraForm'
 
 interface Props {
   periodId: string
+  projectedOpening: number | null
   label?: string
   collapsible?: boolean
 }
 
-export function CurrentPeriod({ periodId, label = 'Current Period', collapsible = false }: Props) {
-  const periods = useStore(s => s.periods)
-  const period = periods.find(p => p.id === periodId)
+export function CurrentPeriod({ periodId, projectedOpening, label = 'Current Period', collapsible = false }: Props) {
+  const period = useStore(s => s.periods.find(p => p.id === periodId))
   const bills = useStore(s => s.bills)
   const allItems = useStore(s => s.periodItems)
   const allExtras = useStore(s => s.extras)
@@ -26,13 +26,6 @@ export function CurrentPeriod({ periodId, label = 'Current Period', collapsible 
   const clearPeriodActuals = useStore(s => s.clearPeriodActuals)
   const resetPeriod = useStore(s => s.resetPeriod)
   const actuals = allActuals.find(a => a.periodId === periodId) ?? null
-
-  const periodIndex = periods.findIndex(p => p.id === periodId)
-  const prevPeriod = periodIndex > 0 ? periods[periodIndex - 1] : null
-  const prevItems = prevPeriod ? allItems.filter(i => i.periodId === prevPeriod.id && !i.dismissed) : []
-  const prevExtras = prevPeriod ? allExtras.filter(e => e.periodId === prevPeriod.id) : []
-  const prevVisibleItems = prevItems.filter(i => bills.find(b => b.id === i.billId)?.active)
-  const prevForecast = prevPeriod ? calcForecast(prevPeriod, prevVisibleItems, bills, prevExtras) : null
 
   const [collapsed, setCollapsed] = useState(collapsible)
   const [editingBalance, setEditingBalance] = useState(false)
@@ -59,9 +52,6 @@ export function CurrentPeriod({ periodId, label = 'Current Period', collapsible 
   const variableItems = visibleItems.filter(i => billMap.get(i.billId)?.category === 'variable')
   const savingsItems = visibleItems.filter(i => billMap.get(i.billId)?.category === 'savings')
 
-  // Opening balance = what you have AFTER this period's paycheck lands.
-  // For projected periods: prev forecast (leftover) + this paycheck.
-  const projectedOpening = prevForecast !== null ? prevForecast + period.payAmount : null
   const effectivePeriod = (period.openingBalance === null && projectedOpening !== null)
     ? { ...period, openingBalance: projectedOpening }
     : period
@@ -203,7 +193,7 @@ export function CurrentPeriod({ periodId, label = 'Current Period', collapsible 
                     <span className="text-slate-400">
                       {formatCurrency(projectedOpening)}
                       <span className="text-xs font-normal text-slate-500 ml-1">
-                        ({formatCurrency(prevForecast!)} + {formatCurrency(period.payAmount)} pay)
+                        ({formatCurrency(projectedOpening - period.payAmount)} + {formatCurrency(period.payAmount)} pay)
                       </span>
                     </span>
                   )
