@@ -122,6 +122,43 @@ export function formatDate(iso: string): string {
 
 export const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
+// Walks all periods in order and computes the effective opening balance for each,
+// chaining forecast → next opening when openingBalance is null in the store.
+export function buildProjectedOpenings(
+  periods: PayPeriod[],
+  allItems: PeriodItem[],
+  allExtras: Extra[],
+  bills: Bill[],
+): Map<string, number | null> {
+  const billMap = new Map(bills.map(b => [b.id, b]))
+  const result = new Map<string, number | null>()
+
+  for (let i = 0; i < periods.length; i++) {
+    const period = periods[i]
+    if (period.openingBalance !== null) {
+      result.set(period.id, period.openingBalance)
+    } else if (i > 0) {
+      const prev = periods[i - 1]
+      const prevOpening = result.get(prev.id) ?? null
+      if (prevOpening !== null) {
+        const prevEffective = { ...prev, openingBalance: prevOpening }
+        const prevItems = allItems.filter(
+          pi => pi.periodId === prev.id && !pi.dismissed && billMap.get(pi.billId)?.active
+        )
+        const prevExtras = allExtras.filter(e => e.periodId === prev.id)
+        const prevForecast = calcForecast(prevEffective, prevItems, bills, prevExtras)
+        result.set(period.id, prevForecast !== null ? prevForecast + period.payAmount : null)
+      } else {
+        result.set(period.id, null)
+      }
+    } else {
+      result.set(period.id, null)
+    }
+  }
+
+  return result
+}
+
 export const PAY_FREQUENCY_LABELS: Record<PayFrequency, string> = {
   weekly: 'Weekly',
   biweekly: 'Every 2 Weeks',

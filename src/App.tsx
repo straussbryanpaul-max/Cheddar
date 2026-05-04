@@ -6,7 +6,7 @@ import { BillsManager } from './components/BillsManager'
 import { QuickLinks } from './components/QuickLinks'
 import { Charts } from './components/Charts'
 import { StatementPanel } from './components/StatementPanel'
-import { formatDate, periodEndDate } from './lib/periods'
+import { formatDate, periodEndDate, buildProjectedOpenings } from './lib/periods'
 
 type Module = 'budget' | 'savings' | 'college' | 'retirement' | 'bills'
 
@@ -44,6 +44,9 @@ export default function App() {
   const periodsWindowDate = useStore(s => s.periodsWindowDate)
   const setPeriodsWindowDate = useStore(s => s.setPeriodsWindowDate)
   const payFrequency = useStore(s => s.payFrequency)
+  const bills = useStore(s => s.bills)
+  const allItems = useStore(s => s.periodItems)
+  const allExtras = useStore(s => s.extras)
   const [module, setModule] = useState<Module>('budget')
   const [showStatement, setShowStatement] = useState(false)
 
@@ -64,6 +67,8 @@ export default function App() {
     const idx = periods.findIndex(p => p.startDate === periodsWindowDate)
     return idx >= 0 ? idx : currentPeriodIdx
   })()
+
+  const projectedOpenings = buildProjectedOpenings(periods, allItems, allExtras, bills)
 
   const isAtPresent = windowStartIdx === currentPeriodIdx
 
@@ -238,7 +243,7 @@ export default function App() {
                   <div className="text-xs text-slate-500 uppercase tracking-widest mb-3">Coming Up</div>
                   <div className="space-y-3">
                     {upcoming.map(p => (
-                      <UpcomingPeriod key={p.id} periodId={p.id} />
+                      <UpcomingPeriod key={p.id} periodId={p.id} projectedOpening={projectedOpenings.get(p.id) ?? null} />
                     ))}
                   </div>
                 </div>

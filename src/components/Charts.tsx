@@ -4,7 +4,7 @@ import {
   ResponsiveContainer, ReferenceLine, Cell, Legend,
 } from 'recharts'
 import { useStore } from '../store'
-import { calcForecast, formatCurrency, formatDate } from '../lib/periods'
+import { calcForecast, formatCurrency, formatDate, buildProjectedOpenings, MONTH_NAMES } from '../lib/periods'
 import type { Bill, PayPeriod, PeriodItem, Extra } from '../types'
 
 function buildChartData(
@@ -42,6 +42,38 @@ function buildChartData(
       extras: Math.round(extrasTotal),
     }
   })
+}
+
+function buildSavingsData(
+  periods: PayPeriod[],
+  allItems: PeriodItem[],
+  allExtras: Extra[],
+  bills: Bill[],
+) {
+  const billMap = new Map(bills.map(b => [b.id, b]))
+  const projectedOpenings = buildProjectedOpenings(periods, allItems, allExtras, bills)
+
+  // Group by month — keep only the LAST period in each month (end-of-month position)
+  const byMonth = new Map<string, { label: string; forecast: number }>()
+
+  for (const period of periods) {
+    const opening = projectedOpenings.get(period.id) ?? null
+    if (opening === null) continue
+
+    const effectivePeriod = { ...period, openingBalance: opening }
+    const items = allItems.filter(i => i.periodId === period.id && !i.dismissed && billMap.get(i.billId)?.active)
+    const extras = allExtras.filter(e => e.periodId === period.id)
+    const forecast = calcForecast(effectivePeriod, items, bills, extras)
+    if (forecast === null) continue
+
+    const d = new Date(period.startDate + 'T00:00:00')
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const label = `${MONTH_NAMES[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`
+    // Last period in this month wins
+    byMonth.set(key, { label, forecast: Math.round(forecast) })
+  }
+
+  return Array.from(byMonth.values())
 }
 
 const COLORS = {
@@ -98,6 +130,19 @@ function SpendingTooltip({ active, payload, label }: { active?: boolean; payload
   )
 }
 
+function SavingsTooltip({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) {
+  if (!active || !payload?.length) return null
+  const val = payload[0]?.value
+  return (
+    <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm shadow-xl">
+      <div className="text-slate-400 mb-1">{label}</div>
+      <div className="font-semibold" style={{ color: val !== undefined && val < 500 ? COLORS.danger : val !== undefined && val < 1500 ? COLORS.warning : COLORS.forecast }}>
+        {val !== undefined ? formatCurrency(val) : '—'}
+      </div>
+    </div>
+  )
+}
+
 export function Charts() {
   const periods = useStore(s => s.periods)
   const allItems = useStore(s => s.periodItems)
@@ -105,6 +150,7 @@ export function Charts() {
   const bills = useStore(s => s.bills)
 
   const data = buildChartData(periods, allItems, allExtras, bills)
+  const savingsData = buildSavingsData(periods, allItems, allExtras, bills)
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
@@ -162,6 +208,31 @@ export function Charts() {
             <Bar dataKey="fixed"    name="Fixed"    stackId="a" fill={COLORS.fixed}    radius={[0,0,0,0]} />
             <Bar dataKey="variable" name="Variable" stackId="a" fill={COLORS.variable} radius={[0,0,0,0]} />
             <Bar dataKey="extras"   name="Extras"   stackId="a" fill={COLORS.extras}   radius={[4,4,0,0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Savings opportunity per month */}
+      <div className="bg-slate-800 rounded-2xl p-5 lg:col-span-2">
+        <div className="text-xs text-slate-500 uppercase tracking-widest mb-1">Savings Opportunity</div>
+        <div className="text-xs text-slate-600 mb-4">End-of-month forecast — what's left to save each month</div>
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={savingsData} margin={{ left: 10, right: 16, top: 4, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+            <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis tick={<CurrencyTick />} axisLine={false} tickLine={false} width={72} />
+            <ReferenceLine y={500}  stroke="#f87171" strokeDasharray="4 2" strokeOpacity={0.5} />
+            <ReferenceLine y={1500} stroke="#facc15" strokeDasharray="4 2" strokeOpacity={0.4} />
+            <Tooltip content={<SavingsTooltip />} />
+            <Bar dataKey="forecast" name="Savings Opportunity" radius={[4, 4, 0, 0]}>
+              {savingsData.map((entry, i) => (
+                <Cell
+                  key={`cell-${i}`}
+                  fill={entry.forecast < 500 ? COLORS.danger : entry.forecast < 1500 ? COLORS.warning : COLORS.forecast}
+                  fillOpacity={0.85}
+                />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
