@@ -396,7 +396,7 @@ export function BillsManager() {
         ) : (
           <button
             onClick={() => setConfirmReset(true)}
-            className="text-xs text-slate-600 hover:text-red-400 transition-colors"
+            className="text-xs text-slate-500 hover:text-red-400 transition-colors"
           >
             Reset to defaults
           </button>

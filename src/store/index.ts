@@ -308,7 +308,9 @@ export const useStore = create<State>()(
 
       resetPeriod: (periodId) =>
         set(s => ({
-          periodItems: s.periodItems.filter(i => i.periodId !== periodId),
+          periodItems: s.periodItems.map(i =>
+            i.periodId === periodId ? { ...i, paid: false, actualAmount: null, dismissed: false } : i
+          ),
           extras: s.extras.filter(e => e.periodId !== periodId),
           periodActuals: s.periodActuals.filter(a => a.periodId !== periodId),
           periods: s.periods.map(p =>
