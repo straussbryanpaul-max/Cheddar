@@ -24,6 +24,7 @@ export function CurrentPeriod({ periodId, label = 'Current Period', collapsible 
   const defaultPayAmount = useStore(s => s.defaultPayAmount)
   const allActuals = useStore(s => s.periodActuals)
   const clearPeriodActuals = useStore(s => s.clearPeriodActuals)
+  const resetPeriod = useStore(s => s.resetPeriod)
   const actuals = allActuals.find(a => a.periodId === periodId) ?? null
 
   const periodIndex = periods.findIndex(p => p.id === periodId)
@@ -38,6 +39,7 @@ export function CurrentPeriod({ periodId, label = 'Current Period', collapsible 
   const [balanceDraft, setBalanceDraft] = useState('')
   const [editingPay, setEditingPay] = useState(false)
   const [payDraft, setPayDraft] = useState('')
+  const [confirmResetPeriod, setConfirmResetPeriod] = useState(false)
 
   useEffect(() => {
     ensurePeriodItems(periodId)
@@ -309,6 +311,25 @@ export function CurrentPeriod({ periodId, label = 'Current Period', collapsible 
 
       <div className="px-4 pb-4 pt-2">
         <AddExtraForm periodId={periodId} />
+      </div>
+
+      <div className="px-4 pb-3 flex justify-end">
+        {confirmResetPeriod ? (
+          <div className="bg-red-900/30 border border-red-700/40 rounded-lg p-3 text-sm w-full">
+            <p className="text-red-300 mb-2 text-xs">Reset this period? Clears all paid status, extras, and balance overrides.</p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setConfirmResetPeriod(false)} className="text-slate-400 hover:text-slate-200 px-3 py-1 text-xs">Cancel</button>
+              <button onClick={() => { resetPeriod(periodId); setConfirmResetPeriod(false) }} className="bg-red-600 hover:bg-red-500 text-white rounded px-3 py-1 text-xs font-medium">Reset Period</button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmResetPeriod(true)}
+            className="text-xs text-slate-700 hover:text-red-400 transition-colors"
+          >
+            Reset period
+          </button>
+        )}
       </div>
     </div>
   )

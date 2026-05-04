@@ -296,8 +296,10 @@ export function BillsManager() {
   const bills = useStore(s => s.bills)
   const addBill = useStore(s => s.addBill)
   const updateBill = useStore(s => s.updateBill)
+  const resetStore = useStore(s => s.resetStore)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
+  const [confirmReset, setConfirmReset] = useState(false)
 
   const fixed = bills.filter(b => b.category === 'fixed')
   const variable = bills.filter(b => b.category === 'variable')
@@ -380,6 +382,25 @@ export function BillsManager() {
 
       <div className="border-t border-slate-700/40 mt-2">
         <PaySettings />
+      </div>
+
+      <div className="border-t border-slate-700/40 px-4 py-4">
+        {confirmReset ? (
+          <div className="bg-red-900/30 border border-red-700/40 rounded-lg p-3 text-sm">
+            <p className="text-red-300 mb-2">This will reset everything — all bills, periods, and history — back to defaults. Cannot be undone.</p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setConfirmReset(false)} className="text-slate-400 hover:text-slate-200 px-3 py-1 text-xs">Cancel</button>
+              <button onClick={() => { resetStore(); setConfirmReset(false) }} className="bg-red-600 hover:bg-red-500 text-white rounded px-3 py-1 text-xs font-medium">Reset Everything</button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmReset(true)}
+            className="text-xs text-slate-600 hover:text-red-400 transition-colors"
+          >
+            Reset to defaults
+          </button>
+        )}
       </div>
     </div>
   )

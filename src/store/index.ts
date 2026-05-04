@@ -47,6 +47,9 @@ interface State {
 
   setPeriodActuals: (periodId: string, entries: ActualEntry[], statementRange: string) => void
   clearPeriodActuals: (periodId: string) => void
+
+  resetStore: () => void
+  resetPeriod: (periodId: string) => void
 }
 
 function uid() {
@@ -288,6 +291,30 @@ export const useStore = create<State>()(
 
       clearPeriodActuals: (periodId) =>
         set(s => ({ periodActuals: s.periodActuals.filter(a => a.periodId !== periodId) })),
+
+      resetStore: () =>
+        set({
+          bills: SEED_BILLS,
+          periods: buildSeedPeriods(DEFAULT_PAY_AMOUNT, DEFAULT_PAY_ANCHOR, DEFAULT_PAY_FREQ),
+          periodItems: [],
+          extras: [],
+          defaultPayAmount: DEFAULT_PAY_AMOUNT,
+          payFrequency: DEFAULT_PAY_FREQ,
+          payAnchorDate: DEFAULT_PAY_ANCHOR,
+          periodsVisible: 2,
+          periodsWindowDate: null,
+          periodActuals: [],
+        }),
+
+      resetPeriod: (periodId) =>
+        set(s => ({
+          periodItems: s.periodItems.filter(i => i.periodId !== periodId),
+          extras: s.extras.filter(e => e.periodId !== periodId),
+          periodActuals: s.periodActuals.filter(a => a.periodId !== periodId),
+          periods: s.periods.map(p =>
+            p.id === periodId ? { ...p, openingBalance: null, payAmount: s.defaultPayAmount } : p
+          ),
+        })),
     }),
     {
       name: 'cheddar-store-v4',
