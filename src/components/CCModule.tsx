@@ -502,7 +502,10 @@ export function CCModule() {
             <Chevron open={allTxOpen} className="text-slate-500" />
             <span className="text-xs text-slate-300 font-medium uppercase tracking-widest">All Transactions</span>
           </div>
-          <span className="text-xs text-slate-500">{filteredTxs.length} total</span>
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs text-slate-500">{filteredTxs.length} items</span>
+            <span className="text-sm font-semibold text-slate-300 tabular-nums">{fmt(totalSpend)}</span>
+          </div>
         </button>
 
         {allTxOpen && (
