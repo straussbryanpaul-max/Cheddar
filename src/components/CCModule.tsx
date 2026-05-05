@@ -259,35 +259,6 @@ export function CCModule() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold text-white">Credit Card</h2>
-          {sortedAnalyses.length > 1 ? (
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setSelectedId(sortedAnalyses[selectedIdx + 1].id)}
-                disabled={selectedIdx >= sortedAnalyses.length - 1}
-                className="p-1 rounded text-slate-400 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
-                title="Previous month"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-              </button>
-              <select
-                className="bg-slate-800 text-slate-200 text-sm font-medium rounded-lg px-2 py-1 border border-slate-600 outline-none cursor-pointer"
-                value={selectedId ?? ''}
-                onChange={e => setSelectedId(e.target.value)}
-              >
-                {sortedAnalyses.map(a => <option key={a.id} value={a.id}>{a.month}</option>)}
-              </select>
-              <button
-                onClick={() => setSelectedId(sortedAnalyses[selectedIdx - 1].id)}
-                disabled={selectedIdx <= 0}
-                className="p-1 rounded text-slate-400 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
-                title="Next month"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-              </button>
-            </div>
-          ) : (
-            <span className="text-sm text-slate-400">{analysis.month}</span>
-          )}
           <span className="text-xs text-slate-600">{analysis.statementRange}</span>
         </div>
         <div className="flex items-center gap-2">
@@ -320,6 +291,19 @@ export function CCModule() {
           </button>
         </div>
       </div>
+
+      {/* Month tabs */}
+      {sortedAnalyses.length > 1 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {sortedAnalyses.map(a => (
+            <button
+              key={a.id}
+              onClick={() => setSelectedId(a.id)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${a.id === selectedId ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'}`}
+            >{a.month}</button>
+          ))}
+        </div>
+      )}
 
       {/* Person filter */}
       <div className="flex items-center gap-1.5">
