@@ -93,8 +93,10 @@ function CalcRow({ account, wealthAccounts }: {
       </td>
       <td className="py-2 pl-2">
         <button
+          type="button"
           onClick={() => deleteCalcAccount(account.id)}
-          className="text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+          className="text-slate-500 hover:text-red-400 transition-colors"
+          title="Remove from projections"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
