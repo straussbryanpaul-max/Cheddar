@@ -12,13 +12,13 @@ const FV_HORIZONS: { label: string; years: number }[] = [
   { label: '20yr', years: 20 },
 ]
 
-function CalcRow({ account, wealthAccounts }: {
+function CalcRow({ account, wealthAccounts, fvHorizon }: {
   account: ProjectionCalcAccount
   wealthAccounts: WealthAccount[]
+  fvHorizon: number
 }) {
   const updateCalcAccount = useStore(s => s.updateCalcAccount)
   const deleteCalcAccount = useStore(s => s.deleteCalcAccount)
-  const [fvHorizon] = useState(10)
 
   const linkedAccount = account.linkedAccountId
     ? wealthAccounts.find(a => a.id === account.linkedAccountId)
@@ -260,7 +260,7 @@ export function ProjectionsTab() {
             </thead>
             <tbody>
               {calcAccounts.map(c => (
-                <CalcRow key={c.id} account={c} wealthAccounts={wealthAccounts} />
+                <CalcRow key={c.id} account={c} wealthAccounts={wealthAccounts} fvHorizon={fvHorizon} />
               ))}
             </tbody>
             {calcAccounts.length > 0 && (
