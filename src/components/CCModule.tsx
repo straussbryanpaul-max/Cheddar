@@ -300,18 +300,16 @@ export function CCModule() {
         </div>
       </div>
 
-      {/* Month tabs */}
-      {sortedAnalyses.length > 1 && (
-        <div className="flex items-center gap-2 flex-wrap">
-          {sortedAnalyses.map(a => (
-            <button
-              key={a.id}
-              onClick={() => setSelectedId(a.id)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${a.id === selectedId ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'}`}
-            >{a.month}</button>
-          ))}
-        </div>
-      )}
+      {/* Month tabs — always visible so you can see what's stored */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {sortedAnalyses.map(a => (
+          <button
+            key={a.id}
+            onClick={() => setSelectedId(a.id)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${a.id === selectedId ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'}`}
+          >{a.month}</button>
+        ))}
+      </div>
 
       {/* Person filter + Flagged toggle */}
       <div className="flex items-center justify-between gap-2">
