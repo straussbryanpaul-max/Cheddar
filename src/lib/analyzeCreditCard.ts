@@ -97,9 +97,11 @@ export async function analyzeCreditCard(
     throw new Error('No text response from Claude')
   }
 
-  const raw = textBlock.text.trim()
-  const json = raw.startsWith('```') ? raw.replace(/^```[^\n]*\n/, '').replace(/```$/, '').trim() : raw
-  const parsed = JSON.parse(json) as CCMonthlyAnalysis
+  const raw = textBlock.text
+  const start = raw.indexOf('{')
+  const end = raw.lastIndexOf('}')
+  if (start === -1 || end === -1) throw new Error('No JSON found in response')
+  const parsed = JSON.parse(raw.slice(start, end + 1)) as CCMonthlyAnalysis
   parsed.savedAt = new Date().toISOString().split('T')[0]
   return parsed
 }
