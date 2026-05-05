@@ -338,11 +338,7 @@ export function CCModule() {
         </button>
       </div>
 
-      {/* Two-column: transactions left, chart sidebar right */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5 items-start">
-      <div className="space-y-4">
-
-      {/* Summary cards */}
+      {/* Summary totals — full width */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-slate-800 rounded-xl p-4">
           <div className="text-xs text-slate-500 mb-1">Total Spend</div>
@@ -360,6 +356,10 @@ export function CCModule() {
           <div className="text-xs text-slate-600 mt-0.5">{oneOffTxs.length} items</div>
         </div>
       </div>
+
+      {/* Two-column body: tables left (3fr), chart right (2fr) */}
+      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-5 items-start">
+      <div className="space-y-3">
 
       {/* ── By Category — Recurring ─────────────────────────────────────────── */}
       {recurringGroups.length > 0 && (
@@ -597,43 +597,41 @@ export function CCModule() {
       </div>
 
       {/* Notes + Ways to Save */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {analysis.notes && (
-          <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
-            <div className="text-xs text-slate-500 uppercase tracking-widest mb-2">Summary</div>
-            <p className="text-slate-300 text-sm leading-relaxed">{analysis.notes}</p>
-          </div>
-        )}
-        {activeSuggestions.length > 0 && (
-          <div className="space-y-2">
-            <div className="text-xs text-slate-500 uppercase tracking-widest mb-2">Ways to Save</div>
-            {activeSuggestions.map(sug => (
-              <div key={sug.id} className="bg-slate-800 rounded-xl p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1">
-                    <p className="text-sm text-slate-300 leading-relaxed">{sug.description}</p>
-                    {sug.potentialSavings != null && (
-                      <div className="text-xs text-emerald-400 mt-1.5 font-medium">~{fmt(sug.potentialSavings)}/mo</div>
-                    )}
-                  </div>
-                  <button onClick={() => dismissCCSuggestion(analysis.id, sug.id)} className="text-slate-600 hover:text-slate-400 transition-colors flex-shrink-0 mt-0.5" title="Dismiss">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+      {analysis.notes && (
+        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
+          <div className="text-xs text-slate-500 uppercase tracking-widest mb-2">Summary</div>
+          <p className="text-slate-300 text-sm leading-relaxed">{analysis.notes}</p>
+        </div>
+      )}
+      {activeSuggestions.length > 0 && (
+        <div className="space-y-2">
+          <div className="text-xs text-slate-500 uppercase tracking-widest mb-1">Ways to Save</div>
+          {activeSuggestions.map(sug => (
+            <div key={sug.id} className="bg-slate-800 rounded-xl p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1">
+                  <p className="text-sm text-slate-300 leading-relaxed">{sug.description}</p>
+                  {sug.potentialSavings != null && (
+                    <div className="text-xs text-emerald-400 mt-1.5 font-medium">~{fmt(sug.potentialSavings)}/mo</div>
+                  )}
                 </div>
+                <button onClick={() => dismissCCSuggestion(analysis.id, sug.id)} className="text-slate-600 hover:text-slate-400 transition-colors flex-shrink-0 mt-0.5" title="Dismiss">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-            ))}
-          </div>
-        )}
-        {activeSuggestions.length === 0 && analysis.reductionSuggestions.length > 0 && (
-          <div className="text-xs text-slate-600 text-center py-4">All suggestions dismissed</div>
-        )}
-      </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {activeSuggestions.length === 0 && analysis.reductionSuggestions.length > 0 && (
+        <div className="text-xs text-slate-600 text-center py-4">All suggestions dismissed</div>
+      )}
 
       </div>{/* end left column */}
 
-      {/* Chart sidebar */}
+      {/* Chart — sits in right column under totals */}
       <div className="lg:sticky lg:top-4">
         <CCCharts transactions={filteredByPerson} />
       </div>
