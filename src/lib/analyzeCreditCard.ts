@@ -87,8 +87,8 @@ export async function analyzeCreditCard(
 
   const response = await client.messages.create({
     model: 'claude-opus-4-7',
-    max_tokens: 16000,
-    thinking: { type: 'adaptive' },
+    max_tokens: 32000,
+    thinking: { type: 'enabled', budget_tokens: 2000 },
     messages: [{ role: 'user', content: userContent }],
   })
 
