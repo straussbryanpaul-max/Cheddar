@@ -88,7 +88,6 @@ export async function analyzeCreditCard(
   const stream = client.messages.stream({
     model: 'claude-opus-4-7',
     max_tokens: 16000,
-    thinking: { type: 'adaptive' },
     messages: [{ role: 'user', content: userContent }],
   })
 
