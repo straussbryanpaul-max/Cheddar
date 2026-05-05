@@ -86,8 +86,7 @@ function AccountForm({ initial, onSave, onCancel, showProjections }: {
   )
 }
 
-function AdjustmentRow({ adj }: { adj: AccountAdjustment }) {
-  const deleteAccountAdjustment = useStore(s => s.deleteAccountAdjustment)
+function AdjustmentRow({ adj, onDelete }: { adj: AccountAdjustment; onDelete: () => void }) {
   const isPositive = adj.amount >= 0
   return (
     <div className="flex items-center justify-between py-0.5 px-2 rounded hover:bg-slate-700/20 text-xs">
@@ -102,7 +101,7 @@ function AdjustmentRow({ adj }: { adj: AccountAdjustment }) {
         <span className={`tabular-nums font-medium ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
           {isPositive ? '+' : ''}{formatCurrency(adj.amount)}
         </span>
-        <button type="button" onClick={() => deleteAccountAdjustment(adj.id)} className="text-slate-600 hover:text-red-400 transition-colors" title="Delete">
+        <button type="button" onClick={onDelete} className="text-slate-600 hover:text-red-400 transition-colors" title="Delete">
           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -112,8 +111,9 @@ function AdjustmentRow({ adj }: { adj: AccountAdjustment }) {
   )
 }
 
-function AddAdjustmentForm({ accountId, onDone }: { accountId: string; onDone: () => void }) {
+function AddAdjustmentForm({ account, onDone }: { account: WealthAccount; onDone: () => void }) {
   const addAccountAdjustment = useStore(s => s.addAccountAdjustment)
+  const updateWealthAccount = useStore(s => s.updateWealthAccount)
   const [type, setType] = useState<AccountAdjustmentType>('actual')
   const [label, setLabel] = useState('')
   const [amount, setAmount] = useState('')
@@ -123,7 +123,10 @@ function AddAdjustmentForm({ accountId, onDone }: { accountId: string; onDone: (
     e.preventDefault()
     const amt = parseFloat(amount)
     if (isNaN(amt) || !label.trim()) return
-    addAccountAdjustment({ accountId, type, label: label.trim(), amount: amt, date })
+    addAccountAdjustment({ accountId: account.id, type, label: label.trim(), amount: amt, date })
+    if (type === 'actual') {
+      updateWealthAccount(account.id, { balance: account.balance + amt })
+    }
     setLabel(''); setAmount('')
     onDone()
   }
@@ -149,15 +152,21 @@ function AccountRow({ account, adjustments }: {
 }) {
   const updateWealthAccount = useStore(s => s.updateWealthAccount)
   const deleteWealthAccount = useStore(s => s.deleteWealthAccount)
+  const deleteAccountAdjustment = useStore(s => s.deleteAccountAdjustment)
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
   const [addingAdj, setAddingAdj] = useState(false)
 
-  const actualNet = adjustments.filter(a => a.type === 'actual').reduce((s, a) => s + a.amount, 0)
   const forecastNet = adjustments.filter(a => a.type === 'forecast').reduce((s, a) => s + a.amount, 0)
-  const adjustedBalance = account.balance + actualNet
-  const projectedBalance = adjustedBalance + forecastNet
-  const hasAdjustments = adjustments.length > 0
+  const projectedBalance = account.balance + forecastNet
+  const hasForecast = forecastNet !== 0
+
+  function handleDeleteAdjustment(adj: AccountAdjustment) {
+    deleteAccountAdjustment(adj.id)
+    if (adj.type === 'actual') {
+      updateWealthAccount(account.id, { balance: account.balance - adj.amount })
+    }
+  }
 
   function handleSave(form: FormState) {
     const balance = parseFloat(form.balance)
@@ -208,11 +217,8 @@ function AccountRow({ account, adjustments }: {
         <div className="flex items-center gap-2 flex-shrink-0">
           <div className="text-right">
             <div className="text-xs font-medium text-emerald-300 tabular-nums">{formatCurrency(account.balance)}</div>
-            {hasAdjustments && (
-              <div className="text-xs text-slate-500 tabular-nums">
-                {formatCurrency(adjustedBalance)}
-                {forecastNet !== 0 && <span className="text-blue-400 ml-1">→ {formatCurrency(projectedBalance)}</span>}
-              </div>
+            {hasForecast && (
+              <div className="text-xs text-blue-400 tabular-nums">→ {formatCurrency(projectedBalance)}</div>
             )}
           </div>
           <button type="button" onClick={() => setEditing(true)} className="text-slate-500 hover:text-blue-400 transition-colors p-0.5" title="Edit">
@@ -230,9 +236,11 @@ function AccountRow({ account, adjustments }: {
 
       {expanded && (
         <div className="pl-9 pr-3 pb-1 space-y-0.5">
-          {adjustments.map(adj => <AdjustmentRow key={adj.id} adj={adj} />)}
+          {adjustments.map(adj => (
+            <AdjustmentRow key={adj.id} adj={adj} onDelete={() => handleDeleteAdjustment(adj)} />
+          ))}
           {addingAdj
-            ? <AddAdjustmentForm accountId={account.id} onDone={() => setAddingAdj(false)} />
+            ? <AddAdjustmentForm account={account} onDone={() => setAddingAdj(false)} />
             : (
               <button type="button" onClick={() => setAddingAdj(true)} className="flex items-center gap-1 text-xs text-slate-500 hover:text-emerald-400 transition-colors py-0.5 px-1 mt-0.5">
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
