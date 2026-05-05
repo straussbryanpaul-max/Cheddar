@@ -7,13 +7,15 @@ import { WealthModule } from './components/WealthModule'
 import { QuickLinks } from './components/QuickLinks'
 import { Charts } from './components/Charts'
 import { StatementPanel } from './components/StatementPanel'
+import { CCModule } from './components/CCModule'
 import { formatDate, periodEndDate, buildProjectedOpenings } from './lib/periods'
 
-type Module = 'budget' | 'savings' | 'college' | 'bills'
+type Module = 'budget' | 'savings' | 'college' | 'bills' | 'cc'
 
 const MODULES: { id: Module; label: string; soon?: boolean }[] = [
   { id: 'budget',  label: 'Budget' },
   { id: 'savings', label: 'Savings & Retirement' },
+  { id: 'cc',      label: 'Credit Card' },
   { id: 'college', label: 'College', soon: true },
 ]
 
@@ -172,6 +174,7 @@ export default function App() {
         <main className="flex-1 min-w-0">
           {module === 'bills'   && <BillsManager />}
           {module === 'savings' && <WealthModule />}
+          {module === 'cc'      && <CCModule />}
           {module === 'college' && <ComingSoon label="College" />}
 
           {module === 'budget' && (

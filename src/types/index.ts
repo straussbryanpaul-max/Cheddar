@@ -58,6 +58,42 @@ export interface PeriodActuals {
   entries: ActualEntry[]
 }
 
+// ─── Credit Card Analysis ────────────────────────────────────────────────────
+
+export type AmazonType = 'subscribe-save' | 'discretionary' | null
+
+export interface CCTransaction {
+  id: string
+  date: string
+  description: string
+  amount: number             // always positive (charge to card)
+  barclaysCategory: string   // raw category from Barclays CSV
+  aiCategory: string         // what Claude picked
+  category: string           // current value (user may override)
+  aiIsRecurring: boolean
+  isRecurring: boolean       // current value (user may override)
+  isAmazon: boolean
+  amazonType: AmazonType
+  amazonItemDescription: string | null
+}
+
+export interface CCReductionSuggestion {
+  id: string
+  description: string
+  potentialSavings: number | null
+  dismissed: boolean
+}
+
+export interface CCMonthlyAnalysis {
+  id: string              // YYYY-MM
+  month: string           // "April 2026"
+  statementRange: string  // "Apr 1 – Apr 30"
+  savedAt: string
+  transactions: CCTransaction[]
+  reductionSuggestions: CCReductionSuggestion[]
+  notes: string
+}
+
 // ─── Wealth / Savings & Retirement ───────────────────────────────────────────
 
 export type AccountType =

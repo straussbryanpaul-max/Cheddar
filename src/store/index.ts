@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, AccountAdjustment, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan } from '../types'
+import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, AccountAdjustment, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan, CCMonthlyAnalysis, CCTransaction } from '../types'
 import { nextPeriodStart, prevPeriodStart, billIncludedInPeriod } from '../lib/periods'
 
 interface State {
@@ -49,6 +49,13 @@ interface State {
 
   setPeriodActuals: (periodId: string, entries: ActualEntry[], statementRange: string) => void
   clearPeriodActuals: (periodId: string) => void
+
+  // Credit card analysis
+  ccAnalyses: CCMonthlyAnalysis[]
+  saveCCAnalysis: (analysis: CCMonthlyAnalysis) => void
+  updateCCTransaction: (analysisId: string, txId: string, updates: Partial<CCTransaction>) => void
+  dismissCCSuggestion: (analysisId: string, suggestionId: string) => void
+  deleteCCAnalysis: (id: string) => void
 
   resetStore: () => void
   resetPeriod: (periodId: string) => void
@@ -189,6 +196,7 @@ export const useStore = create<State>()(
       periodsVisible: 2,
       periodsWindowDate: null,
       periodActuals: [],
+      ccAnalyses: [],
       anthropicApiKey: '',
       ghostMode: false,
       wealthAccounts: SEED_WEALTH_ACCOUNTS,
@@ -348,6 +356,36 @@ export const useStore = create<State>()(
       clearPeriodActuals: (periodId) =>
         set(s => ({ periodActuals: s.periodActuals.filter(a => a.periodId !== periodId) })),
 
+      saveCCAnalysis: (analysis) =>
+        set(s => ({
+          ccAnalyses: [...s.ccAnalyses.filter(a => a.id !== analysis.id), analysis],
+        })),
+
+      updateCCTransaction: (analysisId, txId, updates) =>
+        set(s => ({
+          ccAnalyses: s.ccAnalyses.map(a =>
+            a.id !== analysisId ? a : {
+              ...a,
+              transactions: a.transactions.map(tx => tx.id !== txId ? tx : { ...tx, ...updates }),
+            }
+          ),
+        })),
+
+      dismissCCSuggestion: (analysisId, suggestionId) =>
+        set(s => ({
+          ccAnalyses: s.ccAnalyses.map(a =>
+            a.id !== analysisId ? a : {
+              ...a,
+              reductionSuggestions: a.reductionSuggestions.map(sg =>
+                sg.id !== suggestionId ? sg : { ...sg, dismissed: true }
+              ),
+            }
+          ),
+        })),
+
+      deleteCCAnalysis: (id) =>
+        set(s => ({ ccAnalyses: s.ccAnalyses.filter(a => a.id !== id) })),
+
       resetStore: () =>
         set({
           bills: SEED_BILLS,
@@ -444,6 +482,7 @@ export const useStore = create<State>()(
           periodsWindowDate: p.periodsWindowDate ?? null,
           ghostMode: false,
           periodActuals: p.periodActuals ?? [],
+          ccAnalyses: p.ccAnalyses ?? [],
           wealthAccounts: (p.wealthAccounts && p.wealthAccounts.length > 0) ? p.wealthAccounts : c.wealthAccounts,
           accountAdjustments: p.accountAdjustments ?? [],
           projectionCalcAccounts: p.projectionCalcAccounts ?? [],
