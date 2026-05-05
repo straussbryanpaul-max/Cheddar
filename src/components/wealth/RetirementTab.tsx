@@ -66,6 +66,8 @@ export function RetirementTab() {
   const [adding, setAdding] = useState(false)
   const [editingSS, setEditingSS] = useState(false)
   const [ssDraft, setSsDraft] = useState('')
+  const [editingRate, setEditingRate] = useState(false)
+  const [rateDraft, setRateDraft] = useState('')
 
   const monthlyTotal = plan.expenses.reduce((s, e) => s + e.monthlyAmount, 0)
   const annualExpenses = monthlyTotal * 12
@@ -97,9 +99,19 @@ export function RetirementTab() {
       ? `${selectedSnapshot?.name} — ${plan.snapshotMilestone} ${plan.useSnapshotActual && selectedMilestone.actual !== null ? '(actual)' : '(projected)'}`
       : 'Accounts tagged "Retirement"'
 
-  const fundedYears = annualNetDraw > 0 ? totalRetirementSavings / annualNetDraw : null
+  // Annuity depletion formula: years until portfolio hits zero given growth rate r
+  // n = -ln(1 - r*P/W) / ln(1+r)  (falls back to P/W when r=0)
+  function calcFundedYears(P: number, W: number, r: number): number | null {
+    if (W <= 0) return null
+    if (r <= 0) return P / W
+    if (r * P >= W) return Infinity   // portfolio grows faster than draw — never depletes
+    return -Math.log(1 - (r * P) / W) / Math.log(1 + r)
+  }
+
+  const r = plan.portfolioReturnRate ?? 0
+  const fundedYears = calcFundedYears(totalRetirementSavings, annualNetDraw, r)
   const fundedColor =
-    fundedYears === null ? 'text-slate-400' :
+    fundedYears === null || fundedYears === Infinity ? 'text-emerald-400' :
     fundedYears > 25 ? 'text-emerald-400' :
     fundedYears > 15 ? 'text-yellow-400' :
     'text-red-400'
@@ -108,6 +120,12 @@ export function RetirementTab() {
     const val = parseFloat(ssDraft)
     if (!isNaN(val)) updateRetirementPlan({ socialSecurityAnnual: val })
     setEditingSS(false)
+  }
+
+  function commitRate() {
+    const val = parseFloat(rateDraft) / 100
+    if (!isNaN(val)) updateRetirementPlan({ portfolioReturnRate: Math.max(0, val) })
+    setEditingRate(false)
   }
 
   return (
@@ -153,9 +171,9 @@ export function RetirementTab() {
         </div>
       </div>
 
-      {/* Income */}
+      {/* Income & Assumptions */}
       <div className="px-4 pt-2">
-        <div className="text-xs text-slate-500 uppercase tracking-widest px-3 mb-2">Annual Income</div>
+        <div className="text-xs text-slate-500 uppercase tracking-widest px-3 mb-2">Income & Assumptions</div>
         <div className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-700/30">
           <span className="text-sm text-slate-200">Social Security</span>
           {editingSS ? (
@@ -175,6 +193,33 @@ export function RetirementTab() {
             >
               {plan.socialSecurityAnnual > 0 ? formatCurrency(plan.socialSecurityAnnual) : <span className="text-slate-500">Set amount</span>}
               <span className="text-slate-500 text-xs ml-1">/yr</span>
+            </button>
+          )}
+        </div>
+        <div className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-700/30">
+          <div>
+            <span className="text-sm text-slate-200">Portfolio Return Rate</span>
+            <span className="text-xs text-slate-500 ml-2">during drawdown</span>
+          </div>
+          {editingRate ? (
+            <div className="flex items-center gap-1">
+              <input
+                autoFocus
+                className="bg-slate-700 text-white text-sm rounded px-2 py-1 border border-blue-500 outline-none w-20 text-right"
+                value={rateDraft}
+                onChange={e => setRateDraft(e.target.value)}
+                onBlur={commitRate}
+                onKeyDown={e => { if (e.key === 'Enter') commitRate(); if (e.key === 'Escape') setEditingRate(false) }}
+              />
+              <span className="text-slate-400 text-sm">%</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => { setRateDraft(((plan.portfolioReturnRate ?? 0) * 100).toFixed(1)); setEditingRate(true) }}
+              className="text-sm text-slate-300 hover:text-blue-300 tabular-nums transition-colors"
+            >
+              {((plan.portfolioReturnRate ?? 0) * 100).toFixed(1)}%
             </button>
           )}
         </div>
@@ -302,11 +347,15 @@ export function RetirementTab() {
           <div className="border-t border-slate-600/50 pt-3 flex items-center justify-between">
             <div>
               <div className="text-xs text-slate-500 mb-0.5">Funded Years of Retirement</div>
-              <div className="text-xs text-slate-500">At current draw rate</div>
+              <div className="text-xs text-slate-500">
+                {r > 0
+                  ? `${(r * 100).toFixed(1)}% annual return during drawdown`
+                  : 'No growth assumed'}
+              </div>
             </div>
             <div className={`text-3xl font-bold tabular-nums ${fundedColor}`}>
-              {fundedYears === null ? '∞' : `${fundedYears.toFixed(1)}`}
-              {fundedYears !== null && <span className="text-lg font-normal ml-1">yrs</span>}
+              {fundedYears === null || fundedYears === Infinity ? '∞' : fundedYears.toFixed(1)}
+              {fundedYears !== null && fundedYears !== Infinity && <span className="text-lg font-normal ml-1">yrs</span>}
             </div>
           </div>
         </div>

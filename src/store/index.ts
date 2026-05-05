@@ -192,7 +192,7 @@ export const useStore = create<State>()(
       accountAdjustments: [],
       projectionCalcAccounts: [],
       projectionSnapshots: [],
-      retirementPlan: { expenses: [], socialSecurityAnnual: 0, savingsSource: 'accounts', snapshotId: null, snapshotMilestone: null, useSnapshotActual: false },
+      retirementPlan: { expenses: [], socialSecurityAnnual: 0, portfolioReturnRate: 0.05, savingsSource: 'accounts', snapshotId: null, snapshotMilestone: null, useSnapshotActual: false },
 
       setPaySettings: (s) => {
         set(state => ({
@@ -359,7 +359,7 @@ export const useStore = create<State>()(
           wealthAccounts: [],
           projectionCalcAccounts: [],
           projectionSnapshots: [],
-          retirementPlan: { expenses: [], socialSecurityAnnual: 0, savingsSource: 'accounts', snapshotId: null, snapshotMilestone: null, useSnapshotActual: false },
+          retirementPlan: { expenses: [], socialSecurityAnnual: 0, portfolioReturnRate: 0.05, savingsSource: 'accounts', snapshotId: null, snapshotMilestone: null, useSnapshotActual: false },
         }),
 
       resetPeriod: (periodId) =>

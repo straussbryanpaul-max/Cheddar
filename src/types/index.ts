@@ -127,6 +127,7 @@ export interface RetirementExpense {
 export interface RetirementPlan {
   expenses: RetirementExpense[]
   socialSecurityAnnual: number
+  portfolioReturnRate: number   // annual rate during drawdown, e.g. 0.05
   savingsSource: 'accounts' | 'snapshot'
   snapshotId: string | null
   snapshotMilestone: SnapshotMilestoneLabel | null
