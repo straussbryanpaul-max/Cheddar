@@ -633,7 +633,7 @@ export function CCModule() {
 
       {/* Chart — sits in right column under totals */}
       <div className="lg:sticky lg:top-4">
-        <CCCharts transactions={filteredByPerson} />
+        <CCCharts transactions={filteredTxs} />
       </div>
 
       </div>{/* end two-column grid */}
