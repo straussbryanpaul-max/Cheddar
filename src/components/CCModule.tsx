@@ -41,6 +41,7 @@ export function CCModule() {
   const anthropicApiKey = useStore(s => s.anthropicApiKey)
   const setAnthropicApiKey = useStore(s => s.setAnthropicApiKey)
   const ccAnalyses = useStore(s => s.ccAnalyses)
+  const ccMerchantMemory = useStore(s => s.ccMerchantMemory)
   const saveCCAnalysis = useStore(s => s.saveCCAnalysis)
   const updateCCTransaction = useStore(s => s.updateCCTransaction)
   const dismissCCSuggestion = useStore(s => s.dismissCCSuggestion)
@@ -112,7 +113,7 @@ export function CCModule() {
     setError('')
     setStep('loading')
     try {
-      const result = await analyzeCreditCard(statementFile, amazonCsv || null, key)
+      const result = await analyzeCreditCard(statementFile, amazonCsv || null, key, ccMerchantMemory)
       saveCCAnalysis(result)
       setSelectedId(result.id)
       setStep('results')

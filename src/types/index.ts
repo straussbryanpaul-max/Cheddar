@@ -63,6 +63,16 @@ export interface PeriodActuals {
 export type AmazonType = 'subscribe-save' | 'discretionary' | null
 export type CCPerson = 'Bryan' | 'Rachel' | null
 
+export interface MerchantMemoryEntry {
+  category: string
+  isRecurring: boolean
+  person: CCPerson
+  lastSeen: string  // YYYY-MM
+}
+
+// Keyed by normalized merchant description (uppercased, trimmed)
+export type CCMerchantMemory = Record<string, MerchantMemoryEntry>
+
 export interface CCTransaction {
   id: string
   date: string

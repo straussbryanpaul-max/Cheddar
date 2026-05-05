@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, AccountAdjustment, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan, CCMonthlyAnalysis, CCTransaction } from '../types'
+import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, AccountAdjustment, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan, CCMonthlyAnalysis, CCTransaction, CCMerchantMemory, MerchantMemoryEntry } from '../types'
 import { nextPeriodStart, prevPeriodStart, billIncludedInPeriod } from '../lib/periods'
 
 interface State {
@@ -52,10 +52,12 @@ interface State {
 
   // Credit card analysis
   ccAnalyses: CCMonthlyAnalysis[]
+  ccMerchantMemory: CCMerchantMemory
   saveCCAnalysis: (analysis: CCMonthlyAnalysis) => void
   updateCCTransaction: (analysisId: string, txId: string, updates: Partial<CCTransaction>) => void
   dismissCCSuggestion: (analysisId: string, suggestionId: string) => void
   deleteCCAnalysis: (id: string) => void
+  mergeCCMerchantMemory: (entries: CCMerchantMemory) => void
 
   resetStore: () => void
   resetPeriod: (periodId: string) => void
@@ -197,6 +199,7 @@ export const useStore = create<State>()(
       periodsWindowDate: null,
       periodActuals: [],
       ccAnalyses: [],
+      ccMerchantMemory: {},
       anthropicApiKey: '',
       ghostMode: false,
       wealthAccounts: SEED_WEALTH_ACCOUNTS,
@@ -357,19 +360,53 @@ export const useStore = create<State>()(
         set(s => ({ periodActuals: s.periodActuals.filter(a => a.periodId !== periodId) })),
 
       saveCCAnalysis: (analysis) =>
-        set(s => ({
-          ccAnalyses: [...s.ccAnalyses.filter(a => a.id !== analysis.id), analysis],
-        })),
+        set(s => {
+          const incoming: CCMerchantMemory = {}
+          for (const tx of analysis.transactions) {
+            const key = tx.description.toUpperCase().trim()
+            incoming[key] = {
+              category: tx.category,
+              isRecurring: tx.isRecurring,
+              person: tx.person,
+              lastSeen: analysis.id,
+            }
+          }
+          return {
+            ccAnalyses: [...s.ccAnalyses.filter(a => a.id !== analysis.id), analysis],
+            // Merge: new entries win so fresh analysis data is authoritative
+            ccMerchantMemory: { ...s.ccMerchantMemory, ...incoming },
+          }
+        }),
+
+      mergeCCMerchantMemory: (entries) =>
+        set(s => ({ ccMerchantMemory: { ...s.ccMerchantMemory, ...entries } })),
 
       updateCCTransaction: (analysisId, txId, updates) =>
-        set(s => ({
-          ccAnalyses: s.ccAnalyses.map(a =>
-            a.id !== analysisId ? a : {
-              ...a,
-              transactions: a.transactions.map(tx => tx.id !== txId ? tx : { ...tx, ...updates }),
+        set(s => {
+          const analysis = s.ccAnalyses.find(a => a.id === analysisId)
+          const tx = analysis?.transactions.find(t => t.id === txId)
+          const memoryUpdates: CCMerchantMemory = {}
+          if (tx && (updates.category !== undefined || updates.isRecurring !== undefined || updates.person !== undefined)) {
+            const key = tx.description.toUpperCase().trim()
+            const existing = s.ccMerchantMemory[key]
+            const entry: MerchantMemoryEntry = {
+              category: updates.category ?? existing?.category ?? tx.category,
+              isRecurring: updates.isRecurring ?? existing?.isRecurring ?? tx.isRecurring,
+              person: (updates.person ?? existing?.person ?? tx.person) as MerchantMemoryEntry['person'],
+              lastSeen: analysisId,
             }
-          ),
-        })),
+            memoryUpdates[key] = entry
+          }
+          return {
+            ccAnalyses: s.ccAnalyses.map(a =>
+              a.id !== analysisId ? a : {
+                ...a,
+                transactions: a.transactions.map(t => t.id !== txId ? t : { ...t, ...updates }),
+              }
+            ),
+            ccMerchantMemory: { ...s.ccMerchantMemory, ...memoryUpdates },
+          }
+        }),
 
       dismissCCSuggestion: (analysisId, suggestionId) =>
         set(s => ({
@@ -483,6 +520,7 @@ export const useStore = create<State>()(
           ghostMode: false,
           periodActuals: p.periodActuals ?? [],
           ccAnalyses: p.ccAnalyses ?? [],
+          ccMerchantMemory: p.ccMerchantMemory ?? {},
           wealthAccounts: (p.wealthAccounts && p.wealthAccounts.length > 0) ? p.wealthAccounts : c.wealthAccounts,
           accountAdjustments: p.accountAdjustments ?? [],
           projectionCalcAccounts: p.projectionCalcAccounts ?? [],

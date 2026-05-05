@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import type { CCMonthlyAnalysis, CCTransaction } from '../types'
+import type { CCMonthlyAnalysis, CCTransaction, CCMerchantMemory } from '../types'
 
 export type StatementFile =
   | { type: 'csv'; content: string }
@@ -60,10 +60,20 @@ Rules:
 - potentialSavings: number or null
 - 3-5 suggestions based on what you actually see`
 
+function buildMemorySection(memory: CCMerchantMemory): string {
+  const entries = Object.entries(memory)
+  if (entries.length === 0) return ''
+  const lines = entries.map(([merchant, m]) =>
+    `  "${merchant}" → ${m.category}${m.isRecurring ? ' (recurring)' : ''}${m.person ? `, person: ${m.person}` : ''}`
+  )
+  return `\n\nPreviously learned merchant categorizations — use these unless there is strong evidence to categorize differently:\n${lines.join('\n')}`
+}
+
 export async function analyzeCreditCard(
   statement: StatementFile,
   amazonCsvContent: string | null,
   apiKey: string,
+  merchantMemory: CCMerchantMemory = {},
 ): Promise<CCMonthlyAnalysis> {
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true })
 
@@ -71,13 +81,16 @@ export async function analyzeCreditCard(
     ? `\n\nAmazon Order History CSV:\n\`\`\`\n${amazonCsvContent}\n\`\`\``
     : ''
 
+  const memorySection = buildMemorySection(merchantMemory)
+  const fullPrompt = ANALYSIS_PROMPT + memorySection
+
   const userContent: Anthropic.MessageParam['content'] =
     statement.type === 'pdf'
       ? [
           { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: statement.base64 } },
-          { type: 'text', text: ANALYSIS_PROMPT + amazonSection },
+          { type: 'text', text: fullPrompt + amazonSection },
         ]
-      : ANALYSIS_PROMPT +
+      : fullPrompt +
         `\n\nBarclays CC statement CSV:\n\`\`\`\n${statement.content}\n\`\`\`` +
         amazonSection
 
