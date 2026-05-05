@@ -87,6 +87,7 @@ export interface CCTransaction {
   amazonType: AmazonType
   amazonItemDescription: string | null
   person: CCPerson           // user-assigned; null = unassigned
+  flagged?: boolean          // user-marked for follow-up
 }
 
 export interface CCReductionSuggestion {

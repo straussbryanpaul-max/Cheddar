@@ -126,6 +126,7 @@ export async function analyzeCreditCard(
     amazonType: tx.amazonType ?? null,
     amazonItemDescription: tx.amazonItemDescription ?? null,
     person: (tx.person as CCTransaction['person']) ?? null,
+    flagged: false,
   }))
 
   return {

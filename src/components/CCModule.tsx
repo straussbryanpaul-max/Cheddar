@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useStore } from '../store'
 import { analyzeCreditCard, type StatementFile } from '../lib/analyzeCreditCard'
 import { useFormatCurrency } from '../lib/useFormatCurrency'
+import { CCCharts } from './CCCharts'
 import type { CCMonthlyAnalysis, CCTransaction } from '../types'
 
 const CC_CATEGORIES = [
@@ -60,6 +61,7 @@ export function CCModule() {
   const [editingCatTxId, setEditingCatTxId] = useState<string | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [personFilter, setPersonFilter] = useState<'All' | 'Bryan' | 'Rachel'>('All')
+  const [showFlagged, setShowFlagged] = useState(false)
   const [recurringOpen, setRecurringOpen] = useState(true)
   const [oneOffOpen, setOneOffOpen] = useState(true)
   const [allTxOpen, setAllTxOpen] = useState(false)
@@ -237,9 +239,15 @@ export function CCModule() {
   }
 
   // ── Results ──────────────────────────────────────────────────────────────────
-  const filteredTxs = personFilter === 'All'
+  const filteredByPerson = personFilter === 'All'
     ? analysis.transactions
     : analysis.transactions.filter(tx => tx.person === personFilter)
+
+  const filteredTxs = showFlagged
+    ? filteredByPerson.filter(tx => tx.flagged)
+    : filteredByPerson
+
+  const flaggedCount = analysis.transactions.filter(tx => tx.flagged).length
 
   const recurringTxs = filteredTxs.filter(tx => tx.isRecurring)
   const oneOffTxs = filteredTxs.filter(tx => !tx.isRecurring)
@@ -305,21 +313,36 @@ export function CCModule() {
         </div>
       )}
 
-      {/* Person filter */}
-      <div className="flex items-center gap-1.5">
-        {(['All', 'Bryan', 'Rachel'] as const).map(p => (
-          <button
-            key={p}
-            onClick={() => setPersonFilter(p)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${personFilter === p ? 'bg-slate-600 text-white' : 'bg-slate-800 text-slate-500 hover:text-slate-300 hover:bg-slate-700'}`}
-          >{p}</button>
-        ))}
-        {personFilter !== 'All' && (
-          <span className="text-xs text-slate-600 ml-1">
-            {analysis.transactions.filter(tx => tx.person === personFilter).length} of {analysis.transactions.length} assigned
-          </span>
-        )}
+      {/* Person filter + Flagged toggle */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5">
+          {(['All', 'Bryan', 'Rachel'] as const).map(p => (
+            <button
+              key={p}
+              onClick={() => setPersonFilter(p)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${personFilter === p ? 'bg-slate-600 text-white' : 'bg-slate-800 text-slate-500 hover:text-slate-300 hover:bg-slate-700'}`}
+            >{p}</button>
+          ))}
+          {personFilter !== 'All' && (
+            <span className="text-xs text-slate-600 ml-1">
+              {analysis.transactions.filter(tx => tx.person === personFilter).length} of {analysis.transactions.length} assigned
+            </span>
+          )}
+        </div>
+        <button
+          onClick={() => setShowFlagged(v => !v)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex-shrink-0 ${showFlagged ? 'bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/40' : 'bg-slate-800 text-slate-500 hover:text-slate-300 hover:bg-slate-700'}`}
+        >
+          <svg className={`w-3.5 h-3.5 flex-shrink-0 ${showFlagged ? 'fill-amber-400' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0z" />
+          </svg>
+          Flagged{flaggedCount > 0 ? ` (${flaggedCount})` : ''}
+        </button>
       </div>
+
+      {/* Two-column: transactions left, chart sidebar right */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5 items-start">
+      <div className="space-y-4">
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-3">
@@ -407,6 +430,11 @@ export function CCModule() {
                             <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${tx.person === 'Bryan' ? 'bg-violet-900/50 text-violet-300' : 'bg-pink-900/50 text-pink-300'}`}>{tx.person}</span>
                           )}
                           <span className="text-sm font-medium text-slate-300 tabular-nums w-16 text-right">{fmt(tx.amount)}</span>
+                          <button onClick={() => updateCCTransaction(analysis.id, tx.id, { flagged: !tx.flagged })} className="flex-shrink-0 ml-0.5" title={tx.flagged ? 'Unflag' : 'Flag for follow-up'}>
+                            <svg className={`w-3.5 h-3.5 transition-colors ${tx.flagged ? 'fill-amber-400 text-amber-400' : 'fill-none text-slate-600 hover:text-amber-400'}`} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0z" />
+                            </svg>
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -485,6 +513,11 @@ export function CCModule() {
                             <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${tx.person === 'Bryan' ? 'bg-violet-900/50 text-violet-300' : 'bg-pink-900/50 text-pink-300'}`}>{tx.person}</span>
                           )}
                           <span className="text-sm font-medium text-slate-300 tabular-nums w-16 text-right">{fmt(tx.amount)}</span>
+                          <button onClick={() => updateCCTransaction(analysis.id, tx.id, { flagged: !tx.flagged })} className="flex-shrink-0 ml-0.5" title={tx.flagged ? 'Unflag' : 'Flag for follow-up'}>
+                            <svg className={`w-3.5 h-3.5 transition-colors ${tx.flagged ? 'fill-amber-400 text-amber-400' : 'fill-none text-slate-600 hover:text-amber-400'}`} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0z" />
+                            </svg>
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -553,6 +586,11 @@ export function CCModule() {
                     <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${tx.person === 'Bryan' ? 'bg-violet-900/50 text-violet-300' : 'bg-pink-900/50 text-pink-300'}`}>{tx.person}</span>
                   )}
                   <span className="text-sm font-medium text-slate-300 tabular-nums w-16 text-right">{fmt(tx.amount)}</span>
+                  <button onClick={() => updateCCTransaction(analysis.id, tx.id, { flagged: !tx.flagged })} className="flex-shrink-0 ml-0.5" title={tx.flagged ? 'Unflag' : 'Flag for follow-up'}>
+                    <svg className={`w-3.5 h-3.5 transition-colors ${tx.flagged ? 'fill-amber-400 text-amber-400' : 'fill-none text-slate-600 hover:text-amber-400'}`} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0z" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             ))}
@@ -594,6 +632,15 @@ export function CCModule() {
           <div className="text-xs text-slate-600 text-center py-4">All suggestions dismissed</div>
         )}
       </div>
+
+      </div>{/* end left column */}
+
+      {/* Chart sidebar */}
+      <div className="lg:sticky lg:top-4">
+        <CCCharts transactions={filteredByPerson} />
+      </div>
+
+      </div>{/* end two-column grid */}
     </div>
   )
 }
