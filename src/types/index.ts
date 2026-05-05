@@ -127,4 +127,8 @@ export interface RetirementExpense {
 export interface RetirementPlan {
   expenses: RetirementExpense[]
   socialSecurityAnnual: number
+  savingsSource: 'accounts' | 'snapshot'
+  snapshotId: string | null
+  snapshotMilestone: SnapshotMilestoneLabel | null
+  useSnapshotActual: boolean
 }

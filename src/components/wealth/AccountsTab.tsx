@@ -180,7 +180,6 @@ function AccountRow({ account, adjustments }: {
         initial={defaultForm(account)}
         onSave={handleSave}
         onCancel={() => setEditing(false)}
-        showProjections
       />
     )
   }
