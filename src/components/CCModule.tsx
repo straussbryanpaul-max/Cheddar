@@ -48,7 +48,7 @@ export function CCModule() {
   const dismissCCSuggestion = useStore(s => s.dismissCCSuggestion)
   const deleteCCAnalysis = useStore(s => s.deleteCCAnalysis)
 
-  const sortedAnalyses = [...ccAnalyses].sort((a, b) => b.id.localeCompare(a.id))
+  const sortedAnalyses = [...ccAnalyses].sort((a, b) => b.savedAt.localeCompare(a.savedAt) || b.id.localeCompare(a.id))
   const [selectedId, setSelectedId] = useState<string | null>(sortedAnalyses[0]?.id ?? null)
   const [step, setStep] = useState<Step>(ccAnalyses.length === 0 ? 'upload' : 'results')
   const [apiKeyDraft, setApiKeyDraft] = useState(anthropicApiKey)

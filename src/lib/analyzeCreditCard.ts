@@ -129,8 +129,10 @@ export async function analyzeCreditCard(
     flagged: false,
   }))
 
+  // Use a unique id so two uploads of the same month don't overwrite each other.
+  // parsed.id is YYYY-MM from Claude; we suffix with a timestamp for uniqueness.
   return {
-    id: parsed.id,
+    id: `${parsed.id}-${Date.now()}`,
     month: parsed.month,
     statementRange: parsed.statementRange,
     savedAt: new Date().toISOString().split('T')[0],
