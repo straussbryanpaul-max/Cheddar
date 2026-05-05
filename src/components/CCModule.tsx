@@ -250,6 +250,7 @@ export function CCModule() {
   const oneOffGroups = groupByCategory(oneOffTxs)
   const activeSuggestions = analysis.reductionSuggestions.filter(s => !s.dismissed)
   const sortedTxs = [...filteredTxs].sort((a, b) => b.amount - a.amount)
+  const selectedIdx = sortedAnalyses.findIndex(a => a.id === selectedId)
 
   return (
     <div className="space-y-5">
@@ -258,36 +259,33 @@ export function CCModule() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold text-white">Credit Card</h2>
-          {sortedAnalyses.length > 1 ? (() => {
-            const idx = sortedAnalyses.findIndex(a => a.id === selectedId)
-            return (
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setSelectedId(sortedAnalyses[idx + 1].id)}
-                  disabled={idx >= sortedAnalyses.length - 1}
-                  className="p-1 rounded text-slate-400 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
-                  title="Previous month"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-                </button>
-                <select
-                  className="bg-slate-800 text-slate-200 text-sm font-medium rounded-lg px-2 py-1 border border-slate-600 outline-none cursor-pointer"
-                  value={selectedId ?? ''}
-                  onChange={e => setSelectedId(e.target.value)}
-                >
-                  {sortedAnalyses.map(a => <option key={a.id} value={a.id}>{a.month}</option>)}
-                </select>
-                <button
-                  onClick={() => setSelectedId(sortedAnalyses[idx - 1].id)}
-                  disabled={idx <= 0}
-                  className="p-1 rounded text-slate-400 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
-                  title="Next month"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-                </button>
-              </div>
-            )
-          })() : (
+          {sortedAnalyses.length > 1 ? (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setSelectedId(sortedAnalyses[selectedIdx + 1].id)}
+                disabled={selectedIdx >= sortedAnalyses.length - 1}
+                className="p-1 rounded text-slate-400 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                title="Previous month"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+              </button>
+              <select
+                className="bg-slate-800 text-slate-200 text-sm font-medium rounded-lg px-2 py-1 border border-slate-600 outline-none cursor-pointer"
+                value={selectedId ?? ''}
+                onChange={e => setSelectedId(e.target.value)}
+              >
+                {sortedAnalyses.map(a => <option key={a.id} value={a.id}>{a.month}</option>)}
+              </select>
+              <button
+                onClick={() => setSelectedId(sortedAnalyses[selectedIdx - 1].id)}
+                disabled={selectedIdx <= 0}
+                className="p-1 rounded text-slate-400 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                title="Next month"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+              </button>
+            </div>
+          ) : (
             <span className="text-sm text-slate-400">{analysis.month}</span>
           )}
           <span className="text-xs text-slate-600">{analysis.statementRange}</span>
