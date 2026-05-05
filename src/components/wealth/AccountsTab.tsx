@@ -84,9 +84,9 @@ function AdjustmentRow({ adj }: { adj: AccountAdjustment }) {
   const deleteAccountAdjustment = useStore(s => s.deleteAccountAdjustment)
   const isPositive = adj.amount >= 0
   return (
-    <div className="flex items-center justify-between py-0.5 px-2 rounded group hover:bg-slate-700/20 text-xs">
+    <div className="flex items-center justify-between py-0.5 px-2 rounded hover:bg-slate-700/20 text-xs group/adj">
       <div className="flex items-center gap-2">
-        <span className={`w-12 text-center rounded px-1 py-0.5 font-medium ${adj.type === 'actual' ? 'bg-emerald-900/50 text-emerald-400' : 'bg-blue-900/50 text-blue-400'}`}>
+        <span className={`w-14 text-center rounded px-1 py-0.5 font-medium ${adj.type === 'actual' ? 'bg-emerald-900/50 text-emerald-400' : 'bg-blue-900/50 text-blue-400'}`}>
           {adj.type}
         </span>
         <span className="text-slate-300">{adj.label}</span>
@@ -96,7 +96,11 @@ function AdjustmentRow({ adj }: { adj: AccountAdjustment }) {
         <span className={`tabular-nums font-medium ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
           {isPositive ? '+' : ''}{formatCurrency(adj.amount)}
         </span>
-        <button onClick={() => deleteAccountAdjustment(adj.id)} className="text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-colors">
+        <button
+          onClick={() => deleteAccountAdjustment(adj.id)}
+          className="text-slate-600 hover:text-red-400 transition-colors"
+          title="Delete adjustment"
+        >
           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -137,14 +141,15 @@ function AddAdjustmentForm({ accountId, onDone }: { accountId: string; onDone: (
   )
 }
 
-function AccountRow({ account, onEdit, adjustments }: {
+// Self-contained: manages its own edit/expand state and calls the store directly
+function AccountRow({ account, adjustments }: {
   account: WealthAccount
-  onEdit: () => void
   adjustments: AccountAdjustment[]
 }) {
-  const deleteWealthAccount = useStore(s => s.deleteWealthAccount)
   const updateWealthAccount = useStore(s => s.updateWealthAccount)
+  const deleteWealthAccount = useStore(s => s.deleteWealthAccount)
   const [expanded, setExpanded] = useState(false)
+  const [editing, setEditing] = useState(false)
   const [addingAdj, setAddingAdj] = useState(false)
 
   const actualNet = adjustments.filter(a => a.type === 'actual').reduce((s, a) => s + a.amount, 0)
@@ -153,9 +158,34 @@ function AccountRow({ account, onEdit, adjustments }: {
   const projectedBalance = adjustedBalance + forecastNet
   const hasAdjustments = adjustments.length > 0
 
+  function handleSave(form: FormState) {
+    const balance = parseFloat(form.balance)
+    updateWealthAccount(account.id, {
+      institution: form.institution.trim(),
+      name: form.name.trim(),
+      type: form.type,
+      category: form.category,
+      balance: isNaN(balance) ? 0 : balance,
+      balanceDate: form.balanceDate,
+      notes: form.notes.trim(),
+      includeInProjections: form.includeInProjections,
+    })
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <AccountForm
+        initial={defaultForm(account)}
+        onSave={handleSave}
+        onCancel={() => setEditing(false)}
+      />
+    )
+  }
+
   return (
-    <div className="rounded overflow-hidden">
-      <div className="flex items-center justify-between py-1 px-2 group hover:bg-slate-700/30">
+    <div className="rounded">
+      <div className="flex items-center justify-between py-1 px-2 hover:bg-slate-700/30 rounded">
         <div className="flex items-center gap-2 min-w-0">
           <input
             type="checkbox"
@@ -164,8 +194,12 @@ function AccountRow({ account, onEdit, adjustments }: {
             className="accent-blue-500 flex-shrink-0"
             title="Include in projections"
           />
-          <button onClick={() => setExpanded(e => !e)} className="flex items-center gap-1.5 min-w-0 text-left">
-            <svg className={`w-3 h-3 text-slate-600 flex-shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <button
+            type="button"
+            onClick={() => setExpanded(e => !e)}
+            className="flex items-center gap-1.5 min-w-0 text-left"
+          >
+            <svg className={`w-3 h-3 text-slate-500 flex-shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
             </svg>
             <span className="text-sm text-slate-200">{account.name || account.institution}</span>
@@ -173,7 +207,6 @@ function AccountRow({ account, onEdit, adjustments }: {
               {ACCOUNT_TYPE_LABELS[account.type] ?? account.type}
             </span>
           </button>
-          {account.notes && <span className="text-xs text-slate-600 truncate max-w-[140px] hidden md:inline">{account.notes}</span>}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <div className="text-right">
@@ -185,12 +218,22 @@ function AccountRow({ account, onEdit, adjustments }: {
               </div>
             )}
           </div>
-          <button onClick={onEdit} className="text-slate-700 hover:text-blue-400 transition-colors opacity-0 group-hover:opacity-100">
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="text-slate-500 hover:text-blue-400 transition-colors p-0.5"
+            title="Edit account"
+          >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z" />
             </svg>
           </button>
-          <button onClick={() => deleteWealthAccount(account.id)} className="text-slate-700 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">
+          <button
+            type="button"
+            onClick={() => deleteWealthAccount(account.id)}
+            className="text-slate-500 hover:text-red-400 transition-colors p-0.5"
+            title="Delete account"
+          >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
@@ -199,12 +242,16 @@ function AccountRow({ account, onEdit, adjustments }: {
       </div>
 
       {expanded && (
-        <div className="pl-8 pr-3 pb-1 space-y-0.5">
+        <div className="pl-9 pr-3 pb-1 space-y-0.5">
           {adjustments.map(adj => <AdjustmentRow key={adj.id} adj={adj} />)}
           {addingAdj
             ? <AddAdjustmentForm accountId={account.id} onDone={() => setAddingAdj(false)} />
             : (
-              <button onClick={() => setAddingAdj(true)} className="flex items-center gap-1 text-xs text-slate-600 hover:text-emerald-400 transition-colors py-0.5 px-1">
+              <button
+                type="button"
+                onClick={() => setAddingAdj(true)}
+                className="flex items-center gap-1 text-xs text-slate-500 hover:text-emerald-400 transition-colors py-0.5 px-1 mt-0.5"
+              >
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                 </svg>
@@ -218,13 +265,10 @@ function AccountRow({ account, onEdit, adjustments }: {
   )
 }
 
-function CategorySubSection({ category, accounts, allAdjustments, editingId, setEditingId, onSave }: {
+function CategorySubSection({ category, accounts, allAdjustments }: {
   category: AccountCategory
   accounts: WealthAccount[]
   allAdjustments: AccountAdjustment[]
-  editingId: string | null
-  setEditingId: (id: string | null) => void
-  onSave: (id: string, form: FormState) => void
 }) {
   const [expanded, setExpanded] = useState(true)
   const catTotal = accounts.reduce((s, a) => s + a.balance, 0)
@@ -232,6 +276,7 @@ function CategorySubSection({ category, accounts, allAdjustments, editingId, set
   return (
     <div>
       <button
+        type="button"
         onClick={() => setExpanded(e => !e)}
         className="w-full flex items-center justify-between px-3 py-1 hover:bg-slate-700/20 rounded transition-colors"
       >
@@ -244,37 +289,24 @@ function CategorySubSection({ category, accounts, allAdjustments, editingId, set
         <span className="text-xs text-slate-500 tabular-nums">{formatCurrency(catTotal)}</span>
       </button>
       {expanded && (
-        <div className="ml-3">
-          {accounts.map(a =>
-            editingId === a.id ? (
-              <AccountForm
-                key={a.id}
-                initial={defaultForm(a)}
-                onSave={form => onSave(a.id, form)}
-                onCancel={() => setEditingId(null)}
-              />
-            ) : (
-              <AccountRow
-                key={a.id}
-                account={a}
-                onEdit={() => setEditingId(a.id)}
-                adjustments={allAdjustments.filter(adj => adj.accountId === a.id)}
-              />
-            )
-          )}
+        <div className="ml-3 space-y-0.5">
+          {accounts.map(a => (
+            <AccountRow
+              key={a.id}
+              account={a}
+              adjustments={allAdjustments.filter(adj => adj.accountId === a.id)}
+            />
+          ))}
         </div>
       )}
     </div>
   )
 }
 
-function InstitutionSection({ institution, accounts, allAdjustments, editingId, setEditingId, onSave }: {
+function InstitutionSection({ institution, accounts, allAdjustments }: {
   institution: string
   accounts: WealthAccount[]
   allAdjustments: AccountAdjustment[]
-  editingId: string | null
-  setEditingId: (id: string | null) => void
-  onSave: (id: string, form: FormState) => void
 }) {
   const [expanded, setExpanded] = useState(true)
   const instTotal = accounts.reduce((s, a) => s + a.balance, 0)
@@ -283,6 +315,7 @@ function InstitutionSection({ institution, accounts, allAdjustments, editingId, 
   return (
     <div className="border border-slate-700/50 rounded-lg overflow-hidden">
       <button
+        type="button"
         onClick={() => setExpanded(e => !e)}
         className="w-full flex items-center justify-between px-3 py-2 bg-slate-700/30 hover:bg-slate-700/50 transition-colors"
       >
@@ -304,9 +337,6 @@ function InstitutionSection({ institution, accounts, allAdjustments, editingId, 
               category={cat}
               accounts={accounts.filter(a => a.category === cat)}
               allAdjustments={allAdjustments}
-              editingId={editingId}
-              setEditingId={setEditingId}
-              onSave={onSave}
             />
           ))}
         </div>
@@ -319,14 +349,12 @@ export function AccountsTab() {
   const accounts = useStore(s => s.wealthAccounts)
   const allAdjustments = useStore(s => s.accountAdjustments)
   const addWealthAccount = useStore(s => s.addWealthAccount)
-  const updateWealthAccount = useStore(s => s.updateWealthAccount)
-  const [editingId, setEditingId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [summaryView, setSummaryView] = useState<SummaryView>('bank')
 
-  function handleSave(id: string | null, form: FormState) {
+  function handleAdd(form: FormState) {
     const balance = parseFloat(form.balance)
-    const patch = {
+    addWealthAccount({
       institution: form.institution.trim(),
       name: form.name.trim(),
       type: form.type,
@@ -335,9 +363,8 @@ export function AccountsTab() {
       balanceDate: form.balanceDate,
       notes: form.notes.trim(),
       includeInProjections: form.includeInProjections,
-    }
-    if (id) { updateWealthAccount(id, patch); setEditingId(null) }
-    else { addWealthAccount(patch); setAdding(false) }
+    })
+    setAdding(false)
   }
 
   const grandTotal = accounts.reduce((s, a) => s + a.balance, 0)
@@ -359,11 +386,9 @@ export function AccountsTab() {
 
   return (
     <div className="bg-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-      <div className="bg-slate-700/50 px-5 py-3 flex items-center justify-between">
-        <div>
-          <h2 className="text-white font-semibold text-lg">Accounts</h2>
-          <p className="text-slate-400 text-xs mt-0.5">Total: {formatCurrency(grandTotal)}</p>
-        </div>
+      <div className="bg-slate-700/50 px-5 py-3">
+        <h2 className="text-white font-semibold text-lg">Accounts</h2>
+        <p className="text-slate-400 text-xs mt-0.5">Total: {formatCurrency(grandTotal)}</p>
       </div>
 
       {/* Summary */}
@@ -372,6 +397,7 @@ export function AccountsTab() {
           {(['bank', 'category', 'account'] as const).map(view => (
             <button
               key={view}
+              type="button"
               onClick={() => setSummaryView(view)}
               className={`text-xs px-2.5 py-0.5 rounded-full font-medium transition-colors ${
                 summaryView === view ? 'bg-emerald-700 text-white' : 'text-slate-500 hover:text-slate-300'
@@ -391,7 +417,7 @@ export function AccountsTab() {
         </div>
       </div>
 
-      {/* Accounts: Institution → Category → Account */}
+      {/* Institution → Category → Account */}
       <div className="px-3 py-3 space-y-2">
         {institutions.map(inst => (
           <InstitutionSection
@@ -399,18 +425,16 @@ export function AccountsTab() {
             institution={inst}
             accounts={accounts.filter(a => (a.institution || 'Unknown') === inst)}
             allAdjustments={allAdjustments}
-            editingId={editingId}
-            setEditingId={setEditingId}
-            onSave={(id, form) => handleSave(id, form)}
           />
         ))}
       </div>
 
       <div className="px-3 py-2 border-t border-slate-700/50">
         {adding ? (
-          <AccountForm initial={defaultForm()} onSave={form => handleSave(null, form)} onCancel={() => setAdding(false)} />
+          <AccountForm initial={defaultForm()} onSave={handleAdd} onCancel={() => setAdding(false)} />
         ) : (
           <button
+            type="button"
             onClick={() => setAdding(true)}
             className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-emerald-400 transition-colors py-1.5 px-2"
           >
