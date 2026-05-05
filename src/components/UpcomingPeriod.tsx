@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
-import { calcForecast, formatCurrency, formatDate, periodEndDate } from '../lib/periods'
+import { calcForecast, formatDate, periodEndDate } from '../lib/periods'
+import { useFormatCurrency } from '../lib/useFormatCurrency'
 import { LineItem } from './LineItem'
 import { ExtraItem } from './ExtraItem'
 import { AddExtraForm } from './AddExtraForm'
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export function UpcomingPeriod({ periodId, projectedOpening }: Props) {
+  const fmt = useFormatCurrency()
   const period = useStore(s => s.periods.find(p => p.id === periodId))
   const bills = useStore(s => s.bills)
   const allItems = useStore(s => s.periodItems)
@@ -82,7 +84,7 @@ export function UpcomingPeriod({ periodId, projectedOpening }: Props) {
           </div>
           {effectiveOpening !== null && (
             <div className="text-xs text-slate-500 mt-0.5">
-              Opens {formatCurrency(effectiveOpening)}
+              Opens {fmt(effectiveOpening)}
               {period.openingBalance === null && <span className="text-slate-600 ml-1">projected</span>}
             </div>
           )}
@@ -102,7 +104,7 @@ export function UpcomingPeriod({ periodId, projectedOpening }: Props) {
               />
             ) : (
               <button onClick={startEditPay} className="text-white font-semibold text-sm hover:text-blue-300 transition-colors flex items-center gap-1 ml-auto">
-                {formatCurrency(period.payAmount)}
+                {fmt(period.payAmount)}
                 {period.payAmount !== defaultPayAmount && <span className="text-blue-400 text-xs">*</span>}
               </button>
             )}
@@ -110,7 +112,7 @@ export function UpcomingPeriod({ periodId, projectedOpening }: Props) {
           <div className="text-right">
             <div className="text-xs text-slate-500 mb-0.5">Forecast</div>
             <div className={`text-lg font-bold ${forecastColor}`}>
-              {forecast !== null ? formatCurrency(forecast) : '—'}
+              {forecast !== null ? fmt(forecast) : '—'}
             </div>
           </div>
           <svg
@@ -130,7 +132,7 @@ export function UpcomingPeriod({ periodId, projectedOpening }: Props) {
             <div>
               <div className="text-xs text-slate-500 mb-0.5">Opening Balance</div>
               <div className="text-lg font-bold text-white">
-                {effectiveOpening !== null ? formatCurrency(effectiveOpening) : <span className="text-slate-500">—</span>}
+                {effectiveOpening !== null ? fmt(effectiveOpening) : <span className="text-slate-500">—</span>}
               </div>
               {period.openingBalance === null && effectiveOpening !== null && (
                 <div className="text-xs text-slate-500">projected from prior period</div>
@@ -139,7 +141,7 @@ export function UpcomingPeriod({ periodId, projectedOpening }: Props) {
             <div className="text-right">
               <div className="text-xs text-slate-500 mb-0.5">Forecast</div>
               <div className={`text-2xl font-bold ${forecastColor}`}>
-                {forecast !== null ? formatCurrency(forecast) : '—'}
+                {forecast !== null ? fmt(forecast) : '—'}
               </div>
             </div>
           </div>

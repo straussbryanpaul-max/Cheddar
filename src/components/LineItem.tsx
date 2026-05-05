@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { PeriodItem, Bill } from '../types'
-import { formatCurrency } from '../lib/periods'
+import { useFormatCurrency } from '../lib/useFormatCurrency'
 import { useStore } from '../store'
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
 }
 
 export function LineItem({ item, bill, onDismiss }: Props) {
+  const fmt = useFormatCurrency()
   const togglePaid = useStore(s => s.togglePaid)
   const setActualAmount = useStore(s => s.setActualAmount)
   const [editingAmount, setEditingAmount] = useState(false)
@@ -71,7 +72,7 @@ export function LineItem({ item, bill, onDismiss }: Props) {
             className="flex items-center gap-1 text-sm text-slate-300 hover:text-white transition-colors tabular-nums"
             title="Click to edit amount"
           >
-            {formatCurrency(amount)}
+            {fmt(amount)}
             {item.actualAmount !== null && <span className="text-xs text-blue-400">*</span>}
             <svg className="w-3 h-3 text-slate-600 hover:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z" />

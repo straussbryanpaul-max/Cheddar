@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../../store'
-import { formatCurrency } from '../../lib/periods'
+import { useFormatCurrency } from '../../lib/useFormatCurrency'
 import { MILESTONE_LABELS } from '../../lib/wealth'
 import type { RetirementExpense } from '../../types'
 
@@ -33,12 +33,13 @@ function ExpenseForm({ initial, onSave, onCancel }: {
 }
 
 function ExpenseRow({ expense, onEdit }: { expense: RetirementExpense; onEdit: () => void }) {
+  const fmt = useFormatCurrency()
   const deleteRetirementExpense = useStore(s => s.deleteRetirementExpense)
   return (
     <div className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-slate-700/30">
       <span className="text-sm text-slate-200">{expense.name}</span>
       <div className="flex items-center gap-3">
-        <span className="text-sm tabular-nums text-slate-300">{formatCurrency(expense.monthlyAmount)}<span className="text-slate-500 text-xs">/mo</span></span>
+        <span className="text-sm tabular-nums text-slate-300">{fmt(expense.monthlyAmount)}<span className="text-slate-500 text-xs">/mo</span></span>
         <button type="button" onClick={onEdit} className="text-slate-500 hover:text-blue-400 transition-colors p-0.5" title="Edit">
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z" />
@@ -55,6 +56,7 @@ function ExpenseRow({ expense, onEdit }: { expense: RetirementExpense; onEdit: (
 }
 
 export function RetirementTab() {
+  const fmt = useFormatCurrency()
   const plan = useStore(s => s.retirementPlan)
   const wealthAccounts = useStore(s => s.wealthAccounts)
   const snapshots = useStore(s => s.projectionSnapshots)
@@ -191,7 +193,7 @@ export function RetirementTab() {
               onClick={() => { setSsDraft(String(plan.socialSecurityAnnual)); setEditingSS(true) }}
               className="text-sm text-slate-300 hover:text-blue-300 tabular-nums transition-colors"
             >
-              {plan.socialSecurityAnnual > 0 ? formatCurrency(plan.socialSecurityAnnual) : <span className="text-slate-500">Set amount</span>}
+              {plan.socialSecurityAnnual > 0 ? fmt(plan.socialSecurityAnnual) : <span className="text-slate-500">Set amount</span>}
               <span className="text-slate-500 text-xs ml-1">/yr</span>
             </button>
           )}
@@ -285,7 +287,7 @@ export function RetirementTab() {
                           if (!m) return null
                           return (
                             <option key={l} value={l}>
-                              {l} — {m.actual !== null ? `actual ${formatCurrency(m.actual)}` : `projected ${formatCurrency(m.projected)}`}
+                              {l} — {m.actual !== null ? `actual ${fmt(m.actual)}` : `projected ${fmt(m.projected)}`}
                             </option>
                           )
                         })}
@@ -318,19 +320,19 @@ export function RetirementTab() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <div className="text-xs text-slate-500 mb-0.5">Monthly Expenses</div>
-              <div className="text-lg font-semibold text-slate-200 tabular-nums">{formatCurrency(monthlyTotal)}</div>
+              <div className="text-lg font-semibold text-slate-200 tabular-nums">{fmt(monthlyTotal)}</div>
             </div>
             <div>
               <div className="text-xs text-slate-500 mb-0.5">Annual Expenses</div>
-              <div className="text-lg font-semibold text-slate-200 tabular-nums">{formatCurrency(annualExpenses)}</div>
+              <div className="text-lg font-semibold text-slate-200 tabular-nums">{fmt(annualExpenses)}</div>
             </div>
             <div>
               <div className="text-xs text-slate-500 mb-0.5">SS Income</div>
-              <div className="text-lg font-semibold text-emerald-300 tabular-nums">{formatCurrency(plan.socialSecurityAnnual)}</div>
+              <div className="text-lg font-semibold text-emerald-300 tabular-nums">{fmt(plan.socialSecurityAnnual)}</div>
             </div>
             <div>
               <div className="text-xs text-slate-500 mb-0.5">Annual Net Draw</div>
-              <div className="text-lg font-semibold text-slate-200 tabular-nums">{formatCurrency(annualNetDraw)}</div>
+              <div className="text-lg font-semibold text-slate-200 tabular-nums">{fmt(annualNetDraw)}</div>
             </div>
           </div>
 
@@ -340,7 +342,7 @@ export function RetirementTab() {
                 <div className="text-xs text-slate-500 mb-0.5">Total Retirement Savings</div>
                 <div className="text-xs text-slate-500">{savingsSourceLabel}</div>
               </div>
-              <div className="text-xl font-bold text-slate-200 tabular-nums">{formatCurrency(totalRetirementSavings)}</div>
+              <div className="text-xl font-bold text-slate-200 tabular-nums">{fmt(totalRetirementSavings)}</div>
             </div>
           </div>
 

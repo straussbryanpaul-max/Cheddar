@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import { useStore } from '../store'
 import { analyzeStatement, type StatementAnalysis } from '../lib/analyzeStatement'
-import { formatCurrency, formatDate, periodEndDate } from '../lib/periods'
+import { formatDate, periodEndDate } from '../lib/periods'
+import { useFormatCurrency } from '../lib/useFormatCurrency'
 
 interface Props {
   periodId: string
@@ -12,6 +13,7 @@ interface Props {
 type Step = 'upload' | 'loading' | 'results'
 
 export function StatementPanel({ periodId, periodStart, onClose }: Props) {
+  const fmt = useFormatCurrency()
   const bills = useStore(s => s.bills)
   const periods = useStore(s => s.periods)
   const anthropicApiKey = useStore(s => s.anthropicApiKey)
@@ -244,11 +246,11 @@ export function StatementPanel({ periodId, periodStart, onClose }: Props) {
                           <div>
                             <div className="text-sm text-slate-200 font-medium">{row.billName}</div>
                             <div className="text-xs text-slate-500 mt-0.5">
-                              Budgeted {formatCurrency(row.budgeted)} · Actual {formatCurrency(Math.abs(row.actual))}
+                              Budgeted {fmt(row.budgeted)} · Actual {fmt(Math.abs(row.actual))}
                             </div>
                           </div>
                           <div className={`text-sm font-semibold tabular-nums ${over ? 'text-red-400' : 'text-emerald-400'}`}>
-                            {over ? '−' : '+'}{formatCurrency(Math.abs(row.delta))}
+                            {over ? '−' : '+'}{fmt(Math.abs(row.delta))}
                           </div>
                         </div>
                       )
@@ -269,7 +271,7 @@ export function StatementPanel({ periodId, periodStart, onClose }: Props) {
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-sm font-medium text-slate-200">{s.billName}</span>
-                              <span className="text-xs text-slate-500">{formatCurrency(s.currentAmount)} → {formatCurrency(s.suggestedAmount)}</span>
+                              <span className="text-xs text-slate-500">{fmt(s.currentAmount)} → {fmt(s.suggestedAmount)}</span>
                             </div>
                             <p className="text-xs text-slate-500">{s.reason}</p>
                           </div>
@@ -307,7 +309,7 @@ export function StatementPanel({ periodId, periodStart, onClose }: Props) {
                           <div className="text-xs text-slate-600">{tx.date} · {tx.category}</div>
                         </div>
                         <div className={`text-sm font-medium tabular-nums flex-shrink-0 ${tx.amount < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                          {tx.amount < 0 ? '−' : '+'}{formatCurrency(Math.abs(tx.amount))}
+                          {tx.amount < 0 ? '−' : '+'}{fmt(Math.abs(tx.amount))}
                         </div>
                       </div>
                     ))}
@@ -331,7 +333,7 @@ export function StatementPanel({ periodId, periodStart, onClose }: Props) {
                           <div className="text-xs text-slate-600">{tx.date}</div>
                         </div>
                         <div className="text-sm text-slate-500 tabular-nums flex-shrink-0">
-                          {tx.amount < 0 ? '−' : '+'}{formatCurrency(Math.abs(tx.amount))}
+                          {tx.amount < 0 ? '−' : '+'}{fmt(Math.abs(tx.amount))}
                         </div>
                       </div>
                     ))}

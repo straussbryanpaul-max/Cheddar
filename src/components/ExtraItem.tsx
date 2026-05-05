@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Extra } from '../types'
-import { formatCurrency } from '../lib/periods'
+import { useFormatCurrency } from '../lib/useFormatCurrency'
 import { useStore } from '../store'
 
 interface Props {
@@ -8,6 +8,7 @@ interface Props {
 }
 
 export function ExtraItem({ extra }: Props) {
+  const fmt = useFormatCurrency()
   const toggleExtraPaid = useStore(s => s.toggleExtraPaid)
   const deleteExtra = useStore(s => s.deleteExtra)
   const updateExtra = useStore(s => s.updateExtra)
@@ -73,7 +74,7 @@ export function ExtraItem({ extra }: Props) {
           className="flex items-center gap-1 text-sm text-slate-300 hover:text-white transition-colors tabular-nums"
           title="Click to edit"
         >
-          {formatCurrency(extra.amount)}
+          {fmt(extra.amount)}
           <svg className="w-3 h-3 text-slate-600 hover:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z" />
           </svg>

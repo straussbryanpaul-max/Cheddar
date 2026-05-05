@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useStore } from '../store'
-import { formatCurrency, quarterlyMonths, MONTH_NAMES, PAY_FREQUENCY_LABELS } from '../lib/periods'
+import { quarterlyMonths, MONTH_NAMES, PAY_FREQUENCY_LABELS } from '../lib/periods'
+import { useFormatCurrency } from '../lib/useFormatCurrency'
 import type { Bill, BillCategory, BillFrequency, PayFrequency } from '../types'
 
 function ordinal(n: number) {
@@ -157,6 +158,7 @@ function BillForm({ initial, onSave, onCancel }: {
 }
 
 function BillRow({ bill, onEdit }: { bill: Bill; onEdit: () => void }) {
+  const fmt = useFormatCurrency()
   const deleteBill = useStore(s => s.deleteBill)
   const updateBill = useStore(s => s.updateBill)
 
@@ -175,7 +177,7 @@ function BillRow({ bill, onEdit }: { bill: Bill; onEdit: () => void }) {
         <span className="text-xs text-slate-500">{frequencyLabel(bill)}</span>
       </div>
       <div className="flex items-center gap-3">
-        <span className="text-sm text-slate-300 tabular-nums">{formatCurrency(bill.amount)}</span>
+        <span className="text-sm text-slate-300 tabular-nums">{fmt(bill.amount)}</span>
         <button
           onClick={onEdit}
           className="text-slate-500 hover:text-blue-400 transition-colors"

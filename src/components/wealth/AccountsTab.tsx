@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useStore } from '../../store'
-import { formatCurrency } from '../../lib/periods'
+import { useFormatCurrency } from '../../lib/useFormatCurrency'
 import { ACCOUNT_TYPE_LABELS, ACCOUNT_CATEGORY_LABELS, CATEGORY_ORDER } from '../../lib/wealth'
 import type { WealthAccount, AccountType, AccountCategory, AccountAdjustment, AccountAdjustmentType } from '../../types'
 
@@ -87,6 +87,7 @@ function AccountForm({ initial, onSave, onCancel, showProjections }: {
 }
 
 function AdjustmentRow({ adj, onDelete }: { adj: AccountAdjustment; onDelete: () => void }) {
+  const fmt = useFormatCurrency()
   const isPositive = adj.amount >= 0
   return (
     <div className="flex items-center justify-between py-0.5 px-2 rounded hover:bg-slate-700/20 text-xs">
@@ -99,7 +100,7 @@ function AdjustmentRow({ adj, onDelete }: { adj: AccountAdjustment; onDelete: ()
       </div>
       <div className="flex items-center gap-2">
         <span className={`tabular-nums font-medium ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
-          {isPositive ? '+' : ''}{formatCurrency(adj.amount)}
+          {isPositive ? '+' : ''}{fmt(adj.amount)}
         </span>
         <button type="button" onClick={onDelete} className="text-slate-600 hover:text-red-400 transition-colors" title="Delete">
           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -150,6 +151,7 @@ function AccountRow({ account, adjustments }: {
   account: WealthAccount
   adjustments: AccountAdjustment[]
 }) {
+  const fmt = useFormatCurrency()
   const updateWealthAccount = useStore(s => s.updateWealthAccount)
   const deleteWealthAccount = useStore(s => s.deleteWealthAccount)
   const deleteAccountAdjustment = useStore(s => s.deleteAccountAdjustment)
@@ -216,9 +218,9 @@ function AccountRow({ account, adjustments }: {
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <div className="text-right">
-            <div className="text-xs font-medium text-emerald-300 tabular-nums">{formatCurrency(account.balance)}</div>
+            <div className="text-xs font-medium text-emerald-300 tabular-nums">{fmt(account.balance)}</div>
             {hasForecast && (
-              <div className="text-xs text-blue-400 tabular-nums">→ {formatCurrency(projectedBalance)}</div>
+              <div className="text-xs text-blue-400 tabular-nums">→ {fmt(projectedBalance)}</div>
             )}
           </div>
           <button type="button" onClick={() => setEditing(true)} className="text-slate-500 hover:text-blue-400 transition-colors p-0.5" title="Edit">
@@ -262,6 +264,7 @@ function CategorySubSection({ category, accounts, allAdjustments, expandSig }: {
   allAdjustments: AccountAdjustment[]
   expandSig: ExpandSig
 }) {
+  const fmt = useFormatCurrency()
   const [expanded, setExpanded] = useState(true)
   const catTotal = accounts.reduce((s, a) => s + a.balance, 0)
 
@@ -282,7 +285,7 @@ function CategorySubSection({ category, accounts, allAdjustments, expandSig }: {
           </svg>
           <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">{ACCOUNT_CATEGORY_LABELS[category]}</span>
         </div>
-        <span className="text-xs text-slate-500 tabular-nums">{formatCurrency(catTotal)}</span>
+        <span className="text-xs text-slate-500 tabular-nums">{fmt(catTotal)}</span>
       </button>
       {expanded && (
         <div className="ml-3 space-y-0.5">
@@ -305,6 +308,7 @@ function InstitutionSection({ institution, accounts, allAdjustments, expandSig }
   allAdjustments: AccountAdjustment[]
   expandSig: ExpandSig
 }) {
+  const fmt = useFormatCurrency()
   const [expanded, setExpanded] = useState(true)
   const instTotal = accounts.reduce((s, a) => s + a.balance, 0)
   const categories = CATEGORY_ORDER.filter(cat => accounts.some(a => a.category === cat))
@@ -327,7 +331,7 @@ function InstitutionSection({ institution, accounts, allAdjustments, expandSig }
           <span className="text-sm font-semibold text-slate-200">{institution}</span>
           <span className="text-xs text-slate-600">{accounts.length} acct{accounts.length !== 1 ? 's' : ''}</span>
         </div>
-        <span className="text-sm font-semibold text-emerald-300 tabular-nums">{formatCurrency(instTotal)}</span>
+        <span className="text-sm font-semibold text-emerald-300 tabular-nums">{fmt(instTotal)}</span>
       </button>
 
       {expanded && (
@@ -354,6 +358,7 @@ const EXPAND_LEVELS = [
 ] as const
 
 export function AccountsTab() {
+  const fmt = useFormatCurrency()
   const accounts = useStore(s => s.wealthAccounts)
   const allAdjustments = useStore(s => s.accountAdjustments)
   const addWealthAccount = useStore(s => s.addWealthAccount)
@@ -402,7 +407,7 @@ export function AccountsTab() {
       <div className="bg-slate-700/50 px-5 py-3 flex items-center justify-between">
         <div>
           <h2 className="text-white font-semibold text-lg">Accounts</h2>
-          <p className="text-slate-400 text-xs mt-0.5">Total: {formatCurrency(grandTotal)}</p>
+          <p className="text-slate-400 text-xs mt-0.5">Total: {fmt(grandTotal)}</p>
         </div>
         {/* Expand level buttons */}
         <div className="flex items-center gap-1 bg-slate-800/60 rounded-lg p-0.5">
@@ -441,7 +446,7 @@ export function AccountsTab() {
           {summaryItems.map(({ label, total }) => (
             <div key={label} className="bg-slate-700/50 rounded px-2.5 py-1 text-center">
               <div className="text-xs text-slate-400 truncate max-w-[110px]">{label}</div>
-              <div className="text-xs font-semibold text-emerald-300 tabular-nums">{formatCurrency(total)}</div>
+              <div className="text-xs font-semibold text-emerald-300 tabular-nums">{fmt(total)}</div>
             </div>
           ))}
         </div>

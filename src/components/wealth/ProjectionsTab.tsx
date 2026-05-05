@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../../store'
-import { formatCurrency } from '../../lib/periods'
+import { useFormatCurrency } from '../../lib/useFormatCurrency'
 import { computeFV, MILESTONE_YEARS, MILESTONE_LABELS, addYears } from '../../lib/wealth'
 import type { ProjectionCalcAccount, SnapshotMilestoneLabel, WealthAccount } from '../../types'
 
@@ -17,6 +17,7 @@ function CalcRow({ account, wealthAccounts, fvHorizon }: {
   wealthAccounts: WealthAccount[]
   fvHorizon: number
 }) {
+  const fmt = useFormatCurrency()
   const updateCalcAccount = useStore(s => s.updateCalcAccount)
   const deleteCalcAccount = useStore(s => s.deleteCalcAccount)
 
@@ -40,7 +41,7 @@ function CalcRow({ account, wealthAccounts, fvHorizon }: {
       <td className="py-2 px-2">
         {linkedAccount ? (
           <div className="flex items-center gap-1">
-            <span className="text-sm text-slate-300 tabular-nums">{formatCurrency(linkedAccount.balance)}</span>
+            <span className="text-sm text-slate-300 tabular-nums">{fmt(linkedAccount.balance)}</span>
             <button
               onClick={() => updateCalcAccount(account.id, { linkedAccountId: null })}
               className="text-slate-600 hover:text-red-400 text-xs"
@@ -89,7 +90,7 @@ function CalcRow({ account, wealthAccounts, fvHorizon }: {
         </select>
       </td>
       <td className="py-2 pl-2 text-right tabular-nums text-emerald-300 text-sm font-medium">
-        {formatCurrency(fv)}
+        {fmt(fv)}
       </td>
       <td className="py-2 pl-2">
         <button
@@ -113,6 +114,7 @@ function MilestoneActualCell({ snapshotId, label, actual, actualDate }: {
   actual: number | null
   actualDate: string | null
 }) {
+  const fmt = useFormatCurrency()
   const updateSnapshotMilestone = useStore(s => s.updateSnapshotMilestone)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -147,7 +149,7 @@ function MilestoneActualCell({ snapshotId, label, actual, actualDate }: {
   return (
     <button onClick={startEdit} className="text-sm tabular-nums hover:text-blue-300 transition-colors text-left w-full">
       {actual !== null ? (
-        <span className="text-emerald-300">{formatCurrency(actual)}</span>
+        <span className="text-emerald-300">{fmt(actual)}</span>
       ) : (
         <span className="text-slate-600">— enter</span>
       )}
@@ -156,6 +158,7 @@ function MilestoneActualCell({ snapshotId, label, actual, actualDate }: {
 }
 
 export function ProjectionsTab() {
+  const fmt = useFormatCurrency()
   const calcAccounts = useStore(s => s.projectionCalcAccounts)
   const wealthAccounts = useStore(s => s.wealthAccounts)
   const snapshots = useStore(s => s.projectionSnapshots)
@@ -267,7 +270,7 @@ export function ProjectionsTab() {
               <tfoot>
                 <tr className="border-t border-slate-600">
                   <td colSpan={5} className="pt-3 text-xs text-slate-500 uppercase tracking-widest">Total</td>
-                  <td className="pt-3 text-right tabular-nums text-emerald-300 font-bold">{formatCurrency(totalFV)}</td>
+                  <td className="pt-3 text-right tabular-nums text-emerald-300 font-bold">{fmt(totalFV)}</td>
                   <td />
                 </tr>
               </tfoot>
@@ -352,7 +355,7 @@ export function ProjectionsTab() {
                           <td className="py-2 pr-4 text-slate-300 font-medium">{m.label}</td>
                           <td className="py-2 px-4 text-slate-500 text-xs">{m.targetDate}</td>
                           <td className="py-2 px-4 text-right tabular-nums text-slate-300">
-                            {formatCurrency(m.projected)}
+                            {fmt(m.projected)}
                           </td>
                           <td className="py-2 px-4">
                             <div className="flex items-center gap-2">
@@ -364,7 +367,7 @@ export function ProjectionsTab() {
                               />
                               {delta !== null && (
                                 <span className={`text-xs tabular-nums ${delta >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-                                  {delta >= 0 ? '+' : ''}{formatCurrency(delta)}
+                                  {delta >= 0 ? '+' : ''}{fmt(delta)}
                                 </span>
                               )}
                             </div>

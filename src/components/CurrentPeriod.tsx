@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
-import { calcForecast, formatCurrency, formatDate, periodEndDate } from '../lib/periods'
+import { calcForecast, formatDate, periodEndDate } from '../lib/periods'
+import { useFormatCurrency } from '../lib/useFormatCurrency'
 import { LineItem } from './LineItem'
 import { ExtraItem } from './ExtraItem'
 import { AddExtraForm } from './AddExtraForm'
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function CurrentPeriod({ periodId, projectedOpening, label = 'Current Period', collapsible = false }: Props) {
+  const fmt = useFormatCurrency()
   const period = useStore(s => s.periods.find(p => p.id === periodId))
   const bills = useStore(s => s.bills)
   const allItems = useStore(s => s.periodItems)
@@ -114,7 +116,7 @@ export function CurrentPeriod({ periodId, projectedOpening, label = 'Current Per
             <div className="text-right">
               <div className="text-xs text-slate-500 mb-0.5">Forecast</div>
               <div className={`text-lg font-bold ${forecastColor}`}>
-                {forecast !== null ? formatCurrency(forecast) : '—'}
+                {forecast !== null ? fmt(forecast) : '—'}
               </div>
             </div>
             <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -160,7 +162,7 @@ export function CurrentPeriod({ periodId, projectedOpening, label = 'Current Per
               />
             ) : (
               <button onClick={startEditPay} className="text-white font-semibold hover:text-blue-300 transition-colors flex items-center gap-1 ml-auto">
-                {formatCurrency(period.payAmount)}
+                {fmt(period.payAmount)}
                 {period.payAmount !== defaultPayAmount && (
                   <span className="text-blue-400 text-xs font-bold" title="Overridden from default">*</span>
                 )}
@@ -187,13 +189,13 @@ export function CurrentPeriod({ periodId, projectedOpening, label = 'Current Per
             ) : (
               <button onClick={startEditBalance} className="text-xl font-bold text-white hover:text-blue-300 transition-colors">
                 {period.openingBalance !== null
-                  ? formatCurrency(period.openingBalance)
+                  ? fmt(period.openingBalance)
                   : projectedOpening !== null
                   ? (
                     <span className="text-slate-400">
-                      {formatCurrency(projectedOpening)}
+                      {fmt(projectedOpening)}
                       <span className="text-xs font-normal text-slate-500 ml-1">
-                        ({formatCurrency(projectedOpening - period.payAmount)} + {formatCurrency(period.payAmount)} pay)
+                        ({fmt(projectedOpening - period.payAmount)} + {fmt(period.payAmount)} pay)
                       </span>
                     </span>
                   )
@@ -205,7 +207,7 @@ export function CurrentPeriod({ periodId, projectedOpening, label = 'Current Per
           <div className="text-right">
             <div className="text-xs text-slate-400 mb-0.5">Forecast</div>
             <div className={`text-2xl font-bold ${forecastColor}`}>
-              {forecast !== null ? formatCurrency(forecast) : '—'}
+              {forecast !== null ? fmt(forecast) : '—'}
             </div>
           </div>
         </div>
@@ -283,13 +285,13 @@ export function CurrentPeriod({ periodId, projectedOpening, label = 'Current Per
                 <div key={i} className="flex items-center justify-between px-3 py-2 border-b border-slate-700/30 last:border-0 bg-slate-700/10">
                   <span className="text-sm text-slate-300">{entry.billName}</span>
                   <div className="flex items-center gap-3 text-sm tabular-nums">
-                    <span className="text-slate-500">{formatCurrency(entry.budgeted)}</span>
+                    <span className="text-slate-500">{fmt(entry.budgeted)}</span>
                     <span className="text-slate-600">→</span>
                     <span className={over ? 'text-red-400' : 'text-emerald-400'}>
-                      {formatCurrency(entry.actual)}
+                      {fmt(entry.actual)}
                     </span>
                     <span className={`text-xs ${over ? 'text-red-500' : 'text-emerald-500'}`}>
-                      {over ? '+' : ''}{formatCurrency(delta)}
+                      {over ? '+' : ''}{fmt(delta)}
                     </span>
                   </div>
                 </div>

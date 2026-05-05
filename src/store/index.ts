@@ -16,10 +16,12 @@ interface State {
   periodsWindowDate: string | null   // startDate of first visible period; null = current
   periodActuals: PeriodActuals[]
   anthropicApiKey: string
+  ghostMode: boolean
 
   setPaySettings: (s: { defaultPayAmount?: number; payFrequency?: PayFrequency; payAnchorDate?: string }) => void
   regeneratePeriods: () => void
   setAnthropicApiKey: (key: string) => void
+  setGhostMode: (enabled: boolean) => void
 
   addQuickLink: (link: Omit<QuickLink, 'id'>) => void
   updateQuickLink: (id: string, updates: Partial<QuickLink>) => void
@@ -188,6 +190,7 @@ export const useStore = create<State>()(
       periodsWindowDate: null,
       periodActuals: [],
       anthropicApiKey: '',
+      ghostMode: false,
       wealthAccounts: SEED_WEALTH_ACCOUNTS,
       accountAdjustments: [],
       projectionCalcAccounts: [],
@@ -209,6 +212,7 @@ export const useStore = create<State>()(
       },
 
       setAnthropicApiKey: (key) => set({ anthropicApiKey: key }),
+      setGhostMode: (enabled) => set({ ghostMode: enabled }),
 
       addBill: (bill) =>
         set(s => ({ bills: [...s.bills, { ...bill, id: uid() }] })),
@@ -438,6 +442,7 @@ export const useStore = create<State>()(
           payFrequency: p.payFrequency ?? c.payFrequency,
           payAnchorDate: p.payAnchorDate ?? c.payAnchorDate,
           periodsWindowDate: p.periodsWindowDate ?? null,
+          ghostMode: false,
           periodActuals: p.periodActuals ?? [],
           wealthAccounts: (p.wealthAccounts && p.wealthAccounts.length > 0) ? p.wealthAccounts : c.wealthAccounts,
           accountAdjustments: p.accountAdjustments ?? [],

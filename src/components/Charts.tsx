@@ -4,7 +4,8 @@ import {
   ResponsiveContainer, ReferenceLine, Cell, Legend,
 } from 'recharts'
 import { useStore } from '../store'
-import { calcForecast, formatCurrency, formatDate, buildProjectedOpenings, MONTH_NAMES } from '../lib/periods'
+import { calcForecast, formatDate, buildProjectedOpenings, MONTH_NAMES } from '../lib/periods'
+import { useFormatCurrency } from '../lib/useFormatCurrency'
 import type { Bill, PayPeriod, PeriodItem, Extra } from '../types'
 
 function buildChartData(
@@ -90,28 +91,31 @@ function forecastColor(val: number | undefined) {
 }
 
 function CurrencyTick({ x, y, payload }: { x?: number; y?: number; payload?: { value: number } }) {
+  const fmt = useFormatCurrency()
   if (x === undefined || y === undefined || !payload) return null
   return (
     <text x={x} y={y} dy={4} textAnchor="end" fill="#64748b" fontSize={11}>
-      {formatCurrency(payload.value)}
+      {fmt(payload.value)}
     </text>
   )
 }
 
 function ForecastTooltip({ active, payload, label }: { active?: boolean; payload?: {value: number}[]; label?: string }) {
+  const fmt = useFormatCurrency()
   if (!active || !payload?.length) return null
   const val = payload[0]?.value
   return (
     <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm shadow-xl">
       <div className="text-slate-400 mb-1">{label}</div>
       <div className="font-semibold" style={{ color: forecastColor(val) }}>
-        {val !== undefined ? formatCurrency(val) : '—'}
+        {val !== undefined ? fmt(val) : '—'}
       </div>
     </div>
   )
 }
 
 function SpendingTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string }) {
+  const fmt = useFormatCurrency()
   if (!active || !payload?.length) return null
   return (
     <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm shadow-xl">
@@ -120,7 +124,7 @@ function SpendingTooltip({ active, payload, label }: { active?: boolean; payload
         <div key={p.name} className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
           <span className="text-slate-300 capitalize">{p.name}</span>
-          <span className="ml-auto font-medium text-white">{formatCurrency(p.value)}</span>
+          <span className="ml-auto font-medium text-white">{fmt(p.value)}</span>
         </div>
       ))}
     </div>
@@ -128,13 +132,14 @@ function SpendingTooltip({ active, payload, label }: { active?: boolean; payload
 }
 
 function SavingsTooltip({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) {
+  const fmt = useFormatCurrency()
   if (!active || !payload?.length) return null
   const val = payload[0]?.value
   return (
     <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm shadow-xl">
       <div className="text-slate-400 mb-1">{label}</div>
       <div className="font-semibold" style={{ color: val !== undefined && val < 500 ? COLORS.danger : val !== undefined && val < 1500 ? COLORS.warning : COLORS.forecast }}>
-        {val !== undefined ? formatCurrency(val) : '—'}
+        {val !== undefined ? fmt(val) : '—'}
       </div>
     </div>
   )
