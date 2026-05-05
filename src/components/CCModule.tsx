@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useStore } from '../store'
-import { analyzeCreditCard } from '../lib/analyzeCreditCard'
+import { analyzeCreditCard, type StatementFile } from '../lib/analyzeCreditCard'
 import { useFormatCurrency } from '../lib/useFormatCurrency'
 import type { CCMonthlyAnalysis, AmazonType } from '../types'
 
@@ -49,8 +49,8 @@ export function CCModule() {
   const [step, setStep] = useState<Step>(ccAnalyses.length === 0 ? 'upload' : 'results')
   const [apiKeyDraft, setApiKeyDraft] = useState(anthropicApiKey)
   const [editingKey, setEditingKey] = useState(!anthropicApiKey)
-  const [ccCsv, setCcCsv] = useState('')
-  const [ccFileName, setCcFileName] = useState('')
+  const [statementFile, setStatementFile] = useState<StatementFile | null>(null)
+  const [statementFileName, setStatementFileName] = useState('')
   const [amazonCsv, setAmazonCsv] = useState('')
   const [amazonFileName, setAmazonFileName] = useState('')
   const [error, setError] = useState('')
@@ -62,13 +62,21 @@ export function CCModule() {
 
   const analysis = ccAnalyses.find(a => a.id === selectedId) ?? null
 
-  function handleCCFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleStatementFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    setCcFileName(file.name)
+    setStatementFileName(file.name)
     const reader = new FileReader()
-    reader.onload = ev => setCcCsv(ev.target?.result as string)
-    reader.readAsText(file)
+    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+      reader.onload = ev => {
+        const dataUrl = ev.target?.result as string
+        setStatementFile({ type: 'pdf', base64: dataUrl.split(',')[1] })
+      }
+      reader.readAsDataURL(file)
+    } else {
+      reader.onload = ev => setStatementFile({ type: 'csv', content: ev.target?.result as string })
+      reader.readAsText(file)
+    }
   }
 
   function handleAmazonFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -81,18 +89,18 @@ export function CCModule() {
   }
 
   async function runAnalysis() {
-    if (!ccCsv) { setError('Please select a Barclays CSV first.'); return }
+    if (!statementFile) { setError('Please select a statement file first.'); return }
     const key = editingKey ? apiKeyDraft : anthropicApiKey
     if (!key) { setError('An Anthropic API key is required.'); return }
     if (editingKey) { setAnthropicApiKey(apiKeyDraft); setEditingKey(false) }
     setError('')
     setStep('loading')
     try {
-      const result = await analyzeCreditCard(ccCsv, amazonCsv || null, key)
+      const result = await analyzeCreditCard(statementFile, amazonCsv || null, key)
       saveCCAnalysis(result)
       setSelectedId(result.id)
       setStep('results')
-      setCcCsv(''); setCcFileName(''); setAmazonCsv(''); setAmazonFileName('')
+      setStatementFile(null); setStatementFileName(''); setAmazonCsv(''); setAmazonFileName('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed')
       setStep('upload')
@@ -139,29 +147,32 @@ export function CCModule() {
           <p className="text-xs text-slate-600 mt-2">Stored locally only — sent only to the Anthropic API.</p>
         </div>
 
-        {/* CC Statement CSV */}
+        {/* Statement file */}
         <div className="bg-slate-800 rounded-xl p-4">
           <div className="flex items-center gap-1.5 mb-3">
             <div className="text-xs text-slate-500 uppercase tracking-widest">Barclays Statement</div>
             <div className="text-xs text-red-400">required</div>
+            <div className="text-xs text-slate-600 ml-auto">PDF or CSV</div>
           </div>
           <div
             className="border-2 border-dashed border-slate-600 rounded-xl p-5 text-center cursor-pointer hover:border-blue-500/60 transition-colors"
             onClick={() => ccFileRef.current?.click()}
           >
-            <input ref={ccFileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleCCFile} />
-            {ccFileName ? (
+            <input ref={ccFileRef} type="file" accept=".pdf,.csv,application/pdf,text/csv" className="hidden" onChange={handleStatementFile} />
+            {statementFileName ? (
               <div>
-                <div className="text-emerald-400 text-sm font-medium">{ccFileName}</div>
-                <div className="text-slate-500 text-xs mt-1">{ccCsv.split('\n').length - 1} rows</div>
+                <div className="text-emerald-400 text-sm font-medium">{statementFileName}</div>
+                <div className="text-slate-500 text-xs mt-1">
+                  {statementFile?.type === 'pdf' ? 'PDF — dates read automatically' : `${(statementFile as { type: 'csv'; content: string })?.content.split('\n').length - 1} rows`}
+                </div>
               </div>
             ) : (
               <div>
                 <svg className="w-7 h-7 text-slate-600 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                 </svg>
-                <div className="text-slate-400 text-sm">Click to select Barclays CSV</div>
-                <div className="text-slate-600 text-xs mt-1">Barclays account → Statements → Download CSV</div>
+                <div className="text-slate-400 text-sm">Click to select statement</div>
+                <div className="text-slate-600 text-xs mt-1">Barclays account → Statements → Download (PDF or CSV)</div>
               </div>
             )}
           </div>
@@ -203,7 +214,7 @@ export function CCModule() {
 
         <button
           onClick={runAnalysis}
-          disabled={!ccCsv || (!anthropicApiKey && !apiKeyDraft)}
+          disabled={!statementFile || (!anthropicApiKey && !apiKeyDraft)}
           className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors"
         >
           Analyze with Claude
