@@ -113,6 +113,7 @@ export async function analyzeCreditCard(
     isAmazon: tx.isAmazon ?? false,
     amazonType: tx.amazonType ?? null,
     amazonItemDescription: tx.amazonItemDescription ?? null,
+    person: null,
   }))
 
   return {

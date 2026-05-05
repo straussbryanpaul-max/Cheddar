@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useStore } from '../store'
-import { analyzeStatement, type StatementAnalysis } from '../lib/analyzeStatement'
+import { analyzeStatement, type CategorizedTransaction, type StatementAnalysis } from '../lib/analyzeStatement'
 import { formatDate, periodEndDate } from '../lib/periods'
 import { useFormatCurrency } from '../lib/useFormatCurrency'
 
@@ -11,6 +11,29 @@ interface Props {
 }
 
 type Step = 'upload' | 'loading' | 'results'
+
+function Chevron({ open, className = '' }: { open: boolean; className?: string }) {
+  return (
+    <svg
+      className={`w-3.5 h-3.5 transition-transform flex-shrink-0 ${open ? 'rotate-90' : ''} ${className}`}
+      fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+    </svg>
+  )
+}
+
+function groupByCategory(txs: CategorizedTransaction[]) {
+  const map = new Map<string, { txList: CategorizedTransaction[]; total: number }>()
+  for (const tx of txs) {
+    const e = map.get(tx.category)
+    if (e) { e.txList.push(tx); e.total += Math.abs(tx.amount) }
+    else map.set(tx.category, { txList: [tx], total: Math.abs(tx.amount) })
+  }
+  return [...map.entries()]
+    .map(([cat, d]) => ({ cat, ...d }))
+    .sort((a, b) => b.total - a.total)
+}
 
 export function StatementPanel({ periodId, periodStart, onClose }: Props) {
   const fmt = useFormatCurrency()
@@ -35,7 +58,28 @@ export function StatementPanel({ periodId, periodStart, onClose }: Props) {
   const [savedToPeriod, setSavedToPeriod] = useState<string | null>(null)
   const [savePeriodId, setSavePeriodId] = useState(periodId)
 
+  // Editable merged transaction list
+  const [allTransactions, setAllTransactions] = useState<CategorizedTransaction[]>([])
+  const [recurringOpen, setRecurringOpen] = useState(true)
+  const [oneOffOpen, setOneOffOpen] = useState(true)
+  const [allTxOpen, setAllTxOpen] = useState(false)
+  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set())
+  const [editingTxIdx, setEditingTxIdx] = useState<number | null>(null)
+
   const fileRef = useRef<HTMLInputElement>(null)
+
+  function toggleCat(key: string) {
+    setExpandedCats(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  function updateTx(idx: number, changes: Partial<CategorizedTransaction>) {
+    setAllTransactions(prev => prev.map((tx, i) => i === idx ? { ...tx, ...changes } : tx))
+  }
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -59,6 +103,12 @@ export function StatementPanel({ periodId, periodStart, onClose }: Props) {
     try {
       const result = await analyzeStatement(csvContent, bills, startDate, endDate, key)
       setAnalysis(result)
+      setAllTransactions([
+        ...result.transactions,
+        ...result.uncategorized.map(tx => ({ ...tx, isRecurring: false })),
+      ])
+      setExpandedCats(new Set())
+      setEditingTxIdx(null)
       setStep('results')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed')
@@ -87,12 +137,144 @@ export function StatementPanel({ periodId, periodStart, onClose }: Props) {
 
   const periodLabel = `${startDate} → ${endDate}`
 
+  // Computed from allTransactions
+  const recurringTxs = allTransactions.filter(tx => tx.isRecurring)
+  const oneOffTxs = allTransactions.filter(tx => !tx.isRecurring)
+  const recurringTotal = recurringTxs.reduce((s, tx) => s + Math.abs(tx.amount), 0)
+  const oneOffTotal = oneOffTxs.reduce((s, tx) => s + Math.abs(tx.amount), 0)
+  const recurringGroups = groupByCategory(recurringTxs)
+  const oneOffGroups = groupByCategory(oneOffTxs)
+  const categoryOptions = [...new Set([
+    ...bills.filter(b => b.active).map(b => b.name),
+    ...allTransactions.map(tx => tx.category),
+    'Uncategorized',
+  ])].sort()
+  const sortedWithIdx = allTransactions
+    .map((tx, idx) => ({ tx, idx }))
+    .sort((a, b) => b.tx.date.localeCompare(a.tx.date))
+
+  function TxRow({ tx, idx }: { tx: CategorizedTransaction; idx: number }) {
+    const isEditingCat = editingTxIdx === idx
+    return (
+      <div className="pl-8 pr-4 py-2 flex items-center gap-2 border-t border-slate-700/20">
+        <div className="flex-1 min-w-0">
+          <div className="text-sm text-slate-300 truncate">{tx.description}</div>
+          <div className="text-xs text-slate-600">{tx.date}</div>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <button
+            onClick={() => updateTx(idx, { isRecurring: !tx.isRecurring })}
+            className={`text-xs px-1.5 py-0.5 rounded transition-colors ${
+              tx.isRecurring
+                ? 'bg-blue-900/40 text-blue-400 hover:bg-blue-900/60'
+                : 'bg-slate-700/50 text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            {tx.isRecurring ? 'recurring' : 'one-off'}
+          </button>
+          {isEditingCat ? (
+            <select
+              autoFocus
+              className="bg-slate-700 text-slate-200 text-xs rounded px-1.5 py-0.5 border border-slate-600 outline-none"
+              value={tx.category}
+              onChange={e => { updateTx(idx, { category: e.target.value }); setEditingTxIdx(null) }}
+              onBlur={() => setEditingTxIdx(null)}
+            >
+              {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          ) : (
+            <button
+              onClick={() => setEditingTxIdx(idx)}
+              className="text-xs bg-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-slate-700 px-1.5 py-0.5 rounded transition-colors max-w-[90px] truncate"
+              title={`${tx.category} — click to change`}
+            >
+              {tx.category}
+            </button>
+          )}
+          <span className={`text-sm tabular-nums w-14 text-right ${tx.amount < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+            {tx.amount < 0 ? '−' : '+'}{fmt(Math.abs(tx.amount))}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  function CategorySection({
+    prefix,
+    label,
+    groups,
+    total,
+    count,
+    open,
+    onToggle,
+    accentClass,
+  }: {
+    prefix: string
+    label: string
+    groups: { cat: string; txList: CategorizedTransaction[]; total: number }[]
+    total: number
+    count: number
+    open: boolean
+    onToggle: () => void
+    accentClass: string
+  }) {
+    if (groups.length === 0) return null
+    return (
+      <div className="bg-slate-800 rounded-xl overflow-hidden">
+        <button
+          onClick={onToggle}
+          className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-700/20 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Chevron open={open} className="text-slate-500" />
+            <span className="text-xs text-slate-300 font-medium uppercase tracking-widest">{label}</span>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs text-slate-500">{count} items</span>
+            <span className={`text-sm font-semibold tabular-nums ${accentClass}`}>{fmt(total)}</span>
+          </div>
+        </button>
+
+        {open && (
+          <div className="border-t border-slate-700/50">
+            {groups.map(({ cat, txList, total: catTotal }) => {
+              const catKey = `${prefix}:${cat}`
+              const expanded = expandedCats.has(catKey)
+              return (
+                <div key={catKey} className="border-b border-slate-700/30 last:border-b-0">
+                  <button
+                    onClick={() => toggleCat(catKey)}
+                    className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-slate-700/20 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Chevron open={expanded} className="text-slate-600" />
+                      <span className="text-sm text-slate-200">{cat}</span>
+                      <span className="text-xs text-slate-600">{txList.length} {txList.length === 1 ? 'item' : 'items'}</span>
+                    </div>
+                    <span className="text-sm font-medium text-slate-300 tabular-nums">{fmt(catTotal)}</span>
+                  </button>
+
+                  {expanded && (
+                    <div className="bg-slate-900/30">
+                      {txList.map(tx => {
+                        const idx = allTransactions.indexOf(tx)
+                        return <TxRow key={idx} tx={tx} idx={idx} />
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-end">
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Drawer */}
       <div className="relative w-full max-w-xl h-screen bg-slate-900 border-l border-slate-700 flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/60 flex-shrink-0">
@@ -111,7 +293,6 @@ export function StatementPanel({ periodId, periodStart, onClose }: Props) {
           {/* Upload step */}
           {step === 'upload' && (
             <div className="p-5 space-y-5">
-              {/* API Key */}
               <div className="bg-slate-800 rounded-xl p-4">
                 <div className="text-xs text-slate-500 uppercase tracking-widest mb-2">Anthropic API Key</div>
                 {editingKey ? (
@@ -150,7 +331,6 @@ export function StatementPanel({ periodId, periodStart, onClose }: Props) {
                 <p className="text-xs text-slate-600 mt-2">Key is stored locally only and never sent anywhere except the Anthropic API.</p>
               </div>
 
-              {/* Date range */}
               <div className="bg-slate-800 rounded-xl p-4">
                 <div className="text-xs text-slate-500 uppercase tracking-widest mb-3">Statement Date Range</div>
                 <div className="flex gap-3">
@@ -175,7 +355,6 @@ export function StatementPanel({ periodId, periodStart, onClose }: Props) {
                 </div>
               </div>
 
-              {/* File upload */}
               <div className="bg-slate-800 rounded-xl p-4">
                 <div className="text-xs text-slate-500 uppercase tracking-widest mb-3">Bank Statement (CSV)</div>
                 <div
@@ -224,6 +403,7 @@ export function StatementPanel({ periodId, periodStart, onClose }: Props) {
           {/* Results */}
           {step === 'results' && analysis && (
             <div className="p-5 space-y-5">
+
               {/* Notes */}
               {analysis.notes && (
                 <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
@@ -259,7 +439,7 @@ export function StatementPanel({ periodId, periodStart, onClose }: Props) {
                 </div>
               )}
 
-              {/* Suggestions */}
+              {/* Budget Suggestions */}
               {analysis.suggestions.length > 0 && (
                 <div>
                   <div className="text-xs text-slate-500 uppercase tracking-widest mb-2">Budget Suggestions</div>
@@ -293,51 +473,89 @@ export function StatementPanel({ periodId, periodStart, onClose }: Props) {
                 </div>
               )}
 
-              {/* Transactions */}
-              {analysis.transactions.length > 0 && (
-                <div className="bg-slate-800 rounded-xl overflow-hidden">
-                  <div className="px-4 py-3 border-b border-slate-700/50">
-                    <div className="text-xs text-slate-500 uppercase tracking-widest">
-                      Transactions ({analysis.transactions.length})
-                    </div>
-                  </div>
-                  <div className="divide-y divide-slate-700/30 max-h-64 overflow-y-auto">
-                    {analysis.transactions.map((tx, i) => (
-                      <div key={i} className="px-4 py-2.5 flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="text-sm text-slate-300 truncate">{tx.description}</div>
-                          <div className="text-xs text-slate-600">{tx.date} · {tx.category}</div>
-                        </div>
-                        <div className={`text-sm font-medium tabular-nums flex-shrink-0 ${tx.amount < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                          {tx.amount < 0 ? '−' : '+'}{fmt(Math.abs(tx.amount))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* By Category — Recurring */}
+              <CategorySection
+                prefix="r"
+                label="By Category — Recurring"
+                groups={recurringGroups}
+                total={recurringTotal}
+                count={recurringTxs.length}
+                open={recurringOpen}
+                onToggle={() => setRecurringOpen(!recurringOpen)}
+                accentClass="text-blue-400"
+              />
 
-              {/* Uncategorized */}
-              {analysis.uncategorized.length > 0 && (
-                <div className="bg-slate-800/50 rounded-xl overflow-hidden">
-                  <div className="px-4 py-3 border-b border-slate-700/50">
-                    <div className="text-xs text-slate-500 uppercase tracking-widest">
-                      Uncategorized ({analysis.uncategorized.length})
+              {/* By Category — One Off */}
+              <CategorySection
+                prefix="o"
+                label="By Category — One Off"
+                groups={oneOffGroups}
+                total={oneOffTotal}
+                count={oneOffTxs.length}
+                open={oneOffOpen}
+                onToggle={() => setOneOffOpen(!oneOffOpen)}
+                accentClass="text-amber-400"
+              />
+
+              {/* All Transactions */}
+              {allTransactions.length > 0 && (
+                <div className="bg-slate-800 rounded-xl overflow-hidden">
+                  <button
+                    onClick={() => setAllTxOpen(!allTxOpen)}
+                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-700/20 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Chevron open={allTxOpen} className="text-slate-500" />
+                      <span className="text-xs text-slate-300 font-medium uppercase tracking-widest">All Transactions</span>
                     </div>
-                  </div>
-                  <div className="divide-y divide-slate-700/30">
-                    {analysis.uncategorized.map((tx, i) => (
-                      <div key={i} className="px-4 py-2.5 flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="text-sm text-slate-400 truncate">{tx.description}</div>
-                          <div className="text-xs text-slate-600">{tx.date}</div>
+                    <span className="text-xs text-slate-500">{allTransactions.length} total</span>
+                  </button>
+
+                  {allTxOpen && (
+                    <div className="border-t border-slate-700/50 divide-y divide-slate-700/20 max-h-80 overflow-y-auto">
+                      {sortedWithIdx.map(({ tx, idx }) => (
+                        <div key={idx} className="px-4 py-2.5 flex items-center gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm text-slate-300 truncate">{tx.description}</div>
+                            <div className="text-xs text-slate-600">{tx.date} · {tx.category}</div>
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <button
+                              onClick={() => updateTx(idx, { isRecurring: !tx.isRecurring })}
+                              className={`text-xs px-1.5 py-0.5 rounded transition-colors ${
+                                tx.isRecurring
+                                  ? 'bg-blue-900/40 text-blue-400 hover:bg-blue-900/60'
+                                  : 'bg-slate-700/50 text-slate-500 hover:text-slate-300'
+                              }`}
+                            >
+                              {tx.isRecurring ? 'recurring' : 'one-off'}
+                            </button>
+                            {editingTxIdx === idx ? (
+                              <select
+                                autoFocus
+                                className="bg-slate-700 text-slate-200 text-xs rounded px-1.5 py-0.5 border border-slate-600 outline-none"
+                                value={tx.category}
+                                onChange={e => { updateTx(idx, { category: e.target.value }); setEditingTxIdx(null) }}
+                                onBlur={() => setEditingTxIdx(null)}
+                              >
+                                {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                            ) : (
+                              <button
+                                onClick={() => setEditingTxIdx(idx)}
+                                className="text-xs bg-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-slate-700 px-1.5 py-0.5 rounded transition-colors max-w-[90px] truncate"
+                              >
+                                {tx.category}
+                              </button>
+                            )}
+                            <span className={`text-sm tabular-nums w-14 text-right ${tx.amount < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                              {tx.amount < 0 ? '−' : '+'}{fmt(Math.abs(tx.amount))}
+                            </span>
+                          </div>
                         </div>
-                        <div className="text-sm text-slate-500 tabular-nums flex-shrink-0">
-                          {tx.amount < 0 ? '−' : '+'}{fmt(Math.abs(tx.amount))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -374,7 +592,14 @@ export function StatementPanel({ periodId, periodStart, onClose }: Props) {
               )}
 
               <button
-                onClick={() => { setStep('upload'); setAnalysis(null); setAppliedSuggestions(new Set()); setSavedToPeriod(null) }}
+                onClick={() => {
+                  setStep('upload')
+                  setAnalysis(null)
+                  setAllTransactions([])
+                  setAppliedSuggestions(new Set())
+                  setSavedToPeriod(null)
+                  setExpandedCats(new Set())
+                }}
                 className="w-full bg-slate-700 hover:bg-slate-600 text-slate-300 font-medium py-2.5 rounded-xl transition-colors text-sm"
               >
                 Analyze Another Statement

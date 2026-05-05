@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useStore } from '../store'
 import { analyzeCreditCard, type StatementFile } from '../lib/analyzeCreditCard'
 import { useFormatCurrency } from '../lib/useFormatCurrency'
-import type { CCMonthlyAnalysis, AmazonType } from '../types'
+import type { CCMonthlyAnalysis, AmazonType, CCPerson } from '../types'
 
 const CC_CATEGORIES = [
   'Groceries', 'Dining', 'Gas',
@@ -56,6 +56,7 @@ export function CCModule() {
   const [error, setError] = useState('')
   const [editingCatTxId, setEditingCatTxId] = useState<string | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [personFilter, setPersonFilter] = useState<'All' | 'Bryan' | 'Rachel'>('All')
 
   const ccFileRef = useRef<HTMLInputElement>(null)
   const amazonFileRef = useRef<HTMLInputElement>(null)
@@ -247,10 +248,13 @@ export function CCModule() {
   }
 
   // ── Results ──────────────────────────────────────────────────────────────────
-  const { totalSpend, recurringTotal, oneOffTotal, amazonHousehold, amazonDiscretionary, categories } = computeSummary(analysis)
-  const amazonTxs = analysis.transactions.filter(tx => tx.isAmazon)
+  const filteredTxs = personFilter === 'All'
+    ? analysis.transactions
+    : analysis.transactions.filter(tx => tx.person === personFilter)
+  const { totalSpend, recurringTotal, oneOffTotal, amazonHousehold, amazonDiscretionary, categories } = computeSummary({ ...analysis, transactions: filteredTxs })
+  const amazonTxs = filteredTxs.filter(tx => tx.isAmazon)
   const activeSuggestions = analysis.reductionSuggestions.filter(s => !s.dismissed)
-  const sortedTxs = [...analysis.transactions].sort((a, b) => b.amount - a.amount)
+  const sortedTxs = [...filteredTxs].sort((a, b) => b.amount - a.amount)
 
   return (
     <div className="space-y-5">
@@ -305,6 +309,28 @@ export function CCModule() {
             New Analysis
           </button>
         </div>
+      </div>
+
+      {/* Person filter toggle */}
+      <div className="flex items-center gap-1.5">
+        {(['All', 'Bryan', 'Rachel'] as const).map(p => (
+          <button
+            key={p}
+            onClick={() => setPersonFilter(p)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              personFilter === p
+                ? 'bg-slate-600 text-white'
+                : 'bg-slate-800 text-slate-500 hover:text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            {p}
+          </button>
+        ))}
+        {personFilter !== 'All' && (
+          <span className="text-xs text-slate-600 ml-1">
+            {analysis.transactions.filter(tx => tx.person === personFilter).length} of {analysis.transactions.length} assigned
+          </span>
+        )}
       </div>
 
       {/* Summary cards */}
@@ -475,6 +501,23 @@ export function CCModule() {
                         {tx.category}
                       </button>
                     )}
+                    {/* Person assignment */}
+                    <div className="flex rounded overflow-hidden border border-slate-700">
+                      {(['Bryan', 'Rachel'] as CCPerson[]).map(p => (
+                        <button
+                          key={p as string}
+                          onClick={() => updateCCTransaction(analysis.id, tx.id, { person: tx.person === p ? null : p })}
+                          className={`px-1.5 py-0.5 text-xs font-medium transition-colors first:border-r first:border-slate-700 ${
+                            tx.person === p
+                              ? p === 'Bryan' ? 'bg-violet-600 text-white' : 'bg-pink-600 text-white'
+                              : 'text-slate-600 hover:text-slate-300 hover:bg-slate-700'
+                          }`}
+                          title={p as string}
+                        >
+                          {(p as string)[0]}
+                        </button>
+                      ))}
+                    </div>
                     <span className="text-sm font-medium text-slate-300 tabular-nums w-16 text-right">{fmt(tx.amount)}</span>
                   </div>
                 </div>

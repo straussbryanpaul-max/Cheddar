@@ -7,6 +7,7 @@ export interface CategorizedTransaction {
   amount: number
   category: string
   billId: string | null
+  isRecurring: boolean
 }
 
 export interface CategorySummary {
@@ -76,7 +77,8 @@ Analyze the transactions and return a JSON object with exactly this shape:
       "description": "original description from CSV",
       "amount": 123.45,
       "category": "Groceries",
-      "billId": "b10"
+      "billId": "b10",
+      "isRecurring": true
     }
   ],
   "summary": [
@@ -104,7 +106,8 @@ Analyze the transactions and return a JSON object with exactly this shape:
       "description": "SOME MYSTERY MERCHANT",
       "amount": 34.50,
       "category": "Unknown",
-      "billId": null
+      "billId": null,
+      "isRecurring": false
     }
   ],
   "notes": "Brief human-readable summary of findings"
@@ -119,6 +122,7 @@ Rules:
 - Only include bills in summary if there were actual transactions for that category
 - Only suggest adjustments for categories that show consistent over/under spending
 - billId must be one of the IDs from the bills list, or null for uncategorized
+- isRecurring: true for bills, subscriptions, utilities, and any regular monthly charge; false for one-time or discretionary purchases
 - Return ONLY valid JSON, no markdown, no explanation`
 
   const response = await client.messages.create({

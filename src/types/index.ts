@@ -61,6 +61,7 @@ export interface PeriodActuals {
 // ─── Credit Card Analysis ────────────────────────────────────────────────────
 
 export type AmazonType = 'subscribe-save' | 'discretionary' | null
+export type CCPerson = 'Bryan' | 'Rachel' | null
 
 export interface CCTransaction {
   id: string
@@ -75,6 +76,7 @@ export interface CCTransaction {
   isAmazon: boolean
   amazonType: AmazonType
   amazonItemDescription: string | null
+  person: CCPerson           // user-assigned; null = unassigned
 }
 
 export interface CCReductionSuggestion {
