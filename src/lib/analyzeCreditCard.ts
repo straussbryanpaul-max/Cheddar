@@ -85,13 +85,14 @@ export async function analyzeCreditCard(
         `\n\nBarclays CC statement CSV:\n\`\`\`\n${statement.content}\n\`\`\`` +
         amazonSection
 
-  const response = await client.messages.create({
+  const stream = client.messages.stream({
     model: 'claude-opus-4-7',
     max_tokens: 32000,
     thinking: { type: 'enabled', budget_tokens: 2000 },
     messages: [{ role: 'user', content: userContent }],
   })
 
+  const response = await stream.finalMessage()
   const textBlock = response.content.find(b => b.type === 'text')
   if (!textBlock || textBlock.type !== 'text') {
     throw new Error('No text response from Claude')
