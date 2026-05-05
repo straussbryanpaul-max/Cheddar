@@ -13,6 +13,7 @@ interface RawTransaction {
   amount: number
   category: string
   isRecurring: boolean
+  person?: string | null
   isAmazon?: boolean
   amazonType?: CCTransaction['amazonType']
   amazonItemDescription?: string | null
@@ -27,14 +28,14 @@ interface RawAnalysis {
   reductionSuggestions: CCMonthlyAnalysis['reductionSuggestions']
 }
 
-const ANALYSIS_PROMPT = `You are analyzing a Barclays Arrival Mastercard credit card statement for a personal budgeting app.
+const ANALYSIS_PROMPT = `You are analyzing a Barclays Arrival Mastercard credit card statement for a personal budgeting app. The statement may list transactions under separate sections per authorized cardholder (e.g. "BRYAN STRAUSS" / "RACHEL STRAUSS").
 
 Analyze every credit card charge and return compact JSON. Be terse — short descriptions are fine.
 
 For each transaction:
-1. Category — pick one: Groceries, Dining, Gas, Amazon - Household, Amazon - Discretionary, Streaming, Entertainment, Healthcare, Home & Garden, Shopping, Travel, Clothing, Personal Care, Insurance, Utilities, Other
-2. isRecurring — true if same merchant appears monthly, subscription, insurance, or utility
-3. Amazon only (description contains "AMAZON"): set isAmazon:true; if order history provided match by date (±5 days) and amount to get item name; amazonType "subscribe-save" for household consumables, "discretionary" for electronics/toys/games/books/gadgets
+1. Category — pick one: Groceries, Dining, Gas, Amazon, Streaming, Entertainment, Healthcare, Home & Garden, Shopping, Travel, Clothing, Personal Care, Insurance, Utilities, Other
+2. isRecurring — true if subscription, insurance, utility, or same merchant appears monthly
+3. person — first name of the cardholder whose section this charge appears under (e.g. "Bryan" or "Rachel"). Omit if the statement does not separate by cardholder.
 4. Skip payments TO Barclays and refund credits
 5. Infer statement period from dates in the document
 
@@ -45,9 +46,8 @@ Return ONLY this JSON (no markdown, no explanation). Omit optional fields when n
   "statementRange": "Apr 1 – Apr 30",
   "notes": "2-3 sentence summary",
   "transactions": [
-    {"id":"tx1","date":"2026-04-15","description":"NETFLIX","amount":15.99,"category":"Streaming","isRecurring":true},
-    {"id":"tx2","date":"2026-04-15","description":"AMAZON.COM*AB1","amount":47.83,"category":"Amazon - Household","isRecurring":true,"isAmazon":true,"amazonType":"subscribe-save","amazonItemDescription":"Tide Pods"},
-    {"id":"tx3","date":"2026-04-20","description":"WALMART","amount":93.42,"category":"Groceries","isRecurring":false}
+    {"id":"tx1","date":"2026-04-15","description":"NETFLIX","amount":15.99,"category":"Streaming","isRecurring":true,"person":"Bryan"},
+    {"id":"tx2","date":"2026-04-20","description":"WALMART","amount":93.42,"category":"Groceries","isRecurring":false,"person":"Rachel"}
   ],
   "reductionSuggestions": [
     {"id":"sug1","description":"Specific actionable tip","potentialSavings":25,"dismissed":false}
@@ -56,7 +56,6 @@ Return ONLY this JSON (no markdown, no explanation). Omit optional fields when n
 
 Rules:
 - amount always positive
-- omit isAmazon, amazonType, amazonItemDescription when not an Amazon charge
 - transaction ids: tx1, tx2, ...  suggestion ids: sug1, sug2, ...
 - potentialSavings: number or null
 - 3-5 suggestions based on what you actually see`
@@ -113,7 +112,7 @@ export async function analyzeCreditCard(
     isAmazon: tx.isAmazon ?? false,
     amazonType: tx.amazonType ?? null,
     amazonItemDescription: tx.amazonItemDescription ?? null,
-    person: null,
+    person: (tx.person as CCTransaction['person']) ?? null,
   }))
 
   return {

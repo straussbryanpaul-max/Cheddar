@@ -2,11 +2,10 @@ import { useRef, useState } from 'react'
 import { useStore } from '../store'
 import { analyzeCreditCard, type StatementFile } from '../lib/analyzeCreditCard'
 import { useFormatCurrency } from '../lib/useFormatCurrency'
-import type { CCMonthlyAnalysis, AmazonType, CCPerson } from '../types'
+import type { CCMonthlyAnalysis } from '../types'
 
 const CC_CATEGORIES = [
-  'Groceries', 'Dining', 'Gas',
-  'Amazon - Household', 'Amazon - Discretionary',
+  'Groceries', 'Dining', 'Gas', 'Amazon',
   'Streaming', 'Entertainment', 'Healthcare',
   'Home & Garden', 'Shopping', 'Travel',
   'Clothing', 'Personal Care', 'Insurance', 'Utilities', 'Other',
@@ -18,8 +17,6 @@ function computeSummary(a: CCMonthlyAnalysis) {
   const totalSpend = a.transactions.reduce((sum, tx) => sum + tx.amount, 0)
   const recurringTotal = a.transactions.filter(tx => tx.isRecurring).reduce((sum, tx) => sum + tx.amount, 0)
   const oneOffTotal = a.transactions.filter(tx => !tx.isRecurring).reduce((sum, tx) => sum + tx.amount, 0)
-  const amazonHousehold = a.transactions.filter(tx => tx.amazonType === 'subscribe-save').reduce((sum, tx) => sum + tx.amount, 0)
-  const amazonDiscretionary = a.transactions.filter(tx => tx.amazonType === 'discretionary').reduce((sum, tx) => sum + tx.amount, 0)
 
   const catMap = new Map<string, { total: number; count: number; recurring: boolean }>()
   for (const tx of a.transactions) {
@@ -31,7 +28,7 @@ function computeSummary(a: CCMonthlyAnalysis) {
     .map(([category, d]) => ({ category, ...d }))
     .sort((a, b) => b.total - a.total)
 
-  return { totalSpend, recurringTotal, oneOffTotal, amazonHousehold, amazonDiscretionary, categories }
+  return { totalSpend, recurringTotal, oneOffTotal, categories }
 }
 
 export function CCModule() {
@@ -251,8 +248,7 @@ export function CCModule() {
   const filteredTxs = personFilter === 'All'
     ? analysis.transactions
     : analysis.transactions.filter(tx => tx.person === personFilter)
-  const { totalSpend, recurringTotal, oneOffTotal, amazonHousehold, amazonDiscretionary, categories } = computeSummary({ ...analysis, transactions: filteredTxs })
-  const amazonTxs = filteredTxs.filter(tx => tx.isAmazon)
+  const { totalSpend, recurringTotal, oneOffTotal, categories } = computeSummary({ ...analysis, transactions: filteredTxs })
   const activeSuggestions = analysis.reductionSuggestions.filter(s => !s.dismissed)
   const sortedTxs = [...filteredTxs].sort((a, b) => b.amount - a.amount)
 
@@ -334,35 +330,21 @@ export function CCModule() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         <div className="bg-slate-800 rounded-xl p-4">
           <div className="text-xs text-slate-500 mb-1">Total Spend</div>
           <div className="text-xl font-bold text-white tabular-nums">{fmt(totalSpend)}</div>
-          <div className="text-xs text-slate-600 mt-0.5">{analysis.transactions.length} charges</div>
+          <div className="text-xs text-slate-600 mt-0.5">{filteredTxs.length} charges</div>
         </div>
         <div className="bg-slate-800 rounded-xl p-4">
           <div className="text-xs text-slate-500 mb-1">Recurring</div>
           <div className="text-xl font-bold text-blue-400 tabular-nums">{fmt(recurringTotal)}</div>
-          <div className="text-xs text-slate-600 mt-0.5">{analysis.transactions.filter(t => t.isRecurring).length} items</div>
+          <div className="text-xs text-slate-600 mt-0.5">{filteredTxs.filter(t => t.isRecurring).length} items</div>
         </div>
         <div className="bg-slate-800 rounded-xl p-4">
           <div className="text-xs text-slate-500 mb-1">One-offs</div>
           <div className="text-xl font-bold text-amber-400 tabular-nums">{fmt(oneOffTotal)}</div>
-          <div className="text-xs text-slate-600 mt-0.5">{analysis.transactions.filter(t => !t.isRecurring).length} items</div>
-        </div>
-        <div className="bg-slate-800 rounded-xl p-4">
-          <div className="text-xs text-slate-500 mb-1">Amazon</div>
-          <div className="flex items-baseline gap-2 mt-1">
-            <div>
-              <div className="text-sm font-bold text-emerald-400 tabular-nums">{fmt(amazonHousehold)}</div>
-              <div className="text-xs text-slate-600">household</div>
-            </div>
-            <div className="text-slate-700 text-xs">/</div>
-            <div>
-              <div className="text-sm font-bold text-orange-400 tabular-nums">{fmt(amazonDiscretionary)}</div>
-              <div className="text-xs text-slate-600">discretionary</div>
-            </div>
-          </div>
+          <div className="text-xs text-slate-600 mt-0.5">{filteredTxs.filter(t => !t.isRecurring).length} items</div>
         </div>
       </div>
 
@@ -393,60 +375,6 @@ export function CCModule() {
               ))}
             </div>
           </div>
-
-          {/* Amazon section */}
-          {amazonTxs.length > 0 && (
-            <div className="bg-slate-800 rounded-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-700/50">
-                <div className="text-xs text-slate-500 uppercase tracking-widest">Amazon Charges</div>
-                <div className="text-xs text-slate-600 mt-0.5">
-                  H = household / Subscribe &amp; Save &nbsp;·&nbsp; D = discretionary
-                </div>
-              </div>
-              <div className="divide-y divide-slate-700/30">
-                {amazonTxs.map(tx => (
-                  <div key={tx.id} className="px-4 py-3 flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm text-slate-300 truncate">{tx.description}</div>
-                      {tx.amazonItemDescription && (
-                        <div className="text-xs text-slate-400 mt-0.5 truncate italic">{tx.amazonItemDescription}</div>
-                      )}
-                      <div className="text-xs text-slate-600 mt-0.5">{tx.date}</div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-sm font-semibold text-white tabular-nums">{fmt(tx.amount)}</span>
-                      <div className="flex rounded-lg overflow-hidden border border-slate-700">
-                        <button
-                          onClick={() => updateCCTransaction(analysis.id, tx.id, {
-                            amazonType: (tx.amazonType === 'subscribe-save' ? null : 'subscribe-save') as AmazonType,
-                            category: tx.amazonType === 'subscribe-save' ? tx.aiCategory : 'Amazon - Household',
-                          })}
-                          className={`px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                            tx.amazonType === 'subscribe-save'
-                              ? 'bg-emerald-600 text-white'
-                              : 'text-slate-500 hover:text-emerald-400 hover:bg-slate-700'
-                          }`}
-                          title="Household / Subscribe & Save"
-                        >H</button>
-                        <button
-                          onClick={() => updateCCTransaction(analysis.id, tx.id, {
-                            amazonType: (tx.amazonType === 'discretionary' ? null : 'discretionary') as AmazonType,
-                            category: tx.amazonType === 'discretionary' ? tx.aiCategory : 'Amazon - Discretionary',
-                          })}
-                          className={`px-2.5 py-1.5 text-xs font-medium border-l border-slate-700 transition-colors ${
-                            tx.amazonType === 'discretionary'
-                              ? 'bg-orange-600 text-white'
-                              : 'text-slate-500 hover:text-orange-400 hover:bg-slate-700'
-                          }`}
-                          title="Discretionary"
-                        >D</button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* All Transactions */}
           <div className="bg-slate-800 rounded-xl overflow-hidden">
@@ -501,23 +429,11 @@ export function CCModule() {
                         {tx.category}
                       </button>
                     )}
-                    {/* Person assignment */}
-                    <div className="flex rounded overflow-hidden border border-slate-700">
-                      {(['Bryan', 'Rachel'] as CCPerson[]).map(p => (
-                        <button
-                          key={p as string}
-                          onClick={() => updateCCTransaction(analysis.id, tx.id, { person: tx.person === p ? null : p })}
-                          className={`px-1.5 py-0.5 text-xs font-medium transition-colors first:border-r first:border-slate-700 ${
-                            tx.person === p
-                              ? p === 'Bryan' ? 'bg-violet-600 text-white' : 'bg-pink-600 text-white'
-                              : 'text-slate-600 hover:text-slate-300 hover:bg-slate-700'
-                          }`}
-                          title={p as string}
-                        >
-                          {(p as string)[0]}
-                        </button>
-                      ))}
-                    </div>
+                    {tx.person && (
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${tx.person === 'Bryan' ? 'bg-violet-900/50 text-violet-300' : 'bg-pink-900/50 text-pink-300'}`}>
+                        {tx.person}
+                      </span>
+                    )}
                     <span className="text-sm font-medium text-slate-300 tabular-nums w-16 text-right">{fmt(tx.amount)}</span>
                   </div>
                 </div>
