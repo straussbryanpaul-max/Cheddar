@@ -88,6 +88,8 @@ export interface CCTransaction {
   amazonItemDescription: string | null
   person: CCPerson           // user-assigned; null = unassigned
   flagged?: boolean          // user-marked for follow-up
+  note?: string              // free-text note on a flagged transaction
+  resolved?: boolean         // flagged transaction has been resolved
 }
 
 export interface CCReductionSuggestion {

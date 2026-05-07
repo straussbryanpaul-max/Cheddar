@@ -61,7 +61,9 @@ export function CCModule() {
   const [editingCatTxId, setEditingCatTxId] = useState<string | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [personFilter, setPersonFilter] = useState<'All' | 'Bryan' | 'Rachel'>('All')
-  const [showFlagged, setShowFlagged] = useState(false)
+  const [view, setView] = useState<'results' | 'flagged'>('results')
+  const [editingNoteTxId, setEditingNoteTxId] = useState<string | null>(null)
+  const [noteDraft, setNoteDraft] = useState('')
   const [recurringOpen, setRecurringOpen] = useState(true)
   const [oneOffOpen, setOneOffOpen] = useState(true)
   const [allTxOpen, setAllTxOpen] = useState(false)
@@ -243,11 +245,14 @@ export function CCModule() {
     ? analysis.transactions
     : analysis.transactions.filter(tx => tx.person === personFilter)
 
-  const filteredTxs = showFlagged
-    ? filteredByPerson.filter(tx => tx.flagged)
-    : filteredByPerson
+  const filteredTxs = filteredByPerson
 
-  const flaggedCount = analysis.transactions.filter(tx => tx.flagged).length
+  // Cross-period flagged data
+  const allFlaggedEntries = sortedAnalyses.flatMap(a =>
+    a.transactions.filter(tx => tx.flagged).map(tx => ({ tx, a }))
+  )
+  const unresolvedCount = allFlaggedEntries.filter(({ tx }) => !tx.resolved).length
+  const totalFlaggedCount = allFlaggedEntries.length
 
   const recurringTxs = filteredTxs.filter(tx => tx.isRecurring)
   const oneOffTxs = filteredTxs.filter(tx => !tx.isRecurring)
@@ -313,33 +318,142 @@ export function CCModule() {
 
       {/* Person filter + Flagged toggle */}
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          {(['All', 'Bryan', 'Rachel'] as const).map(p => (
-            <button
-              key={p}
-              onClick={() => setPersonFilter(p)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${personFilter === p ? 'bg-slate-600 text-white' : 'bg-slate-800 text-slate-500 hover:text-slate-300 hover:bg-slate-700'}`}
-            >{p}</button>
-          ))}
-          {personFilter !== 'All' && (
-            <span className="text-xs text-slate-600 ml-1">
-              {analysis.transactions.filter(tx => tx.person === personFilter).length} of {analysis.transactions.length} assigned
-            </span>
-          )}
-        </div>
+        {view === 'results' ? (
+          <div className="flex items-center gap-1.5">
+            {(['All', 'Bryan', 'Rachel'] as const).map(p => (
+              <button
+                key={p}
+                onClick={() => setPersonFilter(p)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${personFilter === p ? 'bg-slate-600 text-white' : 'bg-slate-800 text-slate-500 hover:text-slate-300 hover:bg-slate-700'}`}
+              >{p}</button>
+            ))}
+            {personFilter !== 'All' && (
+              <span className="text-xs text-slate-600 ml-1">
+                {analysis.transactions.filter(tx => tx.person === personFilter).length} of {analysis.transactions.length} assigned
+              </span>
+            )}
+          </div>
+        ) : (
+          <div className="text-xs text-slate-500">
+            {unresolvedCount > 0 ? `${unresolvedCount} unresolved` : 'All resolved'}{totalFlaggedCount > 0 ? ` · ${totalFlaggedCount} total` : ''}
+          </div>
+        )}
         <button
-          onClick={() => setShowFlagged(v => !v)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex-shrink-0 ${showFlagged ? 'bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/40' : 'bg-slate-800 text-slate-500 hover:text-slate-300 hover:bg-slate-700'}`}
+          onClick={() => setView(v => v === 'flagged' ? 'results' : 'flagged')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex-shrink-0 ${view === 'flagged' ? 'bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/40' : 'bg-slate-800 text-slate-500 hover:text-slate-300 hover:bg-slate-700'}`}
         >
-          <svg className={`w-3.5 h-3.5 flex-shrink-0 ${showFlagged ? 'fill-amber-400' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+          <svg className={`w-3.5 h-3.5 flex-shrink-0 ${view === 'flagged' ? 'fill-amber-400' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0z" />
           </svg>
-          Flagged{flaggedCount > 0 ? ` (${flaggedCount})` : ''}
+          Flagged{unresolvedCount > 0 ? ` (${unresolvedCount})` : totalFlaggedCount > 0 ? ` (${totalFlaggedCount})` : ''}
         </button>
       </div>
 
-      {/* Summary totals — full width */}
-      <div className="grid grid-cols-3 gap-3">
+      {/* ── Flagged Panel ─────────────────────────────────────────────────────── */}
+      {view === 'flagged' && (() => {
+        const analysesWithFlags = sortedAnalyses.filter(a => a.transactions.some(tx => tx.flagged))
+        const unresolvedEntries = analysesWithFlags.flatMap(a =>
+          a.transactions.filter(tx => tx.flagged && !tx.resolved).map(tx => ({ tx, a }))
+        )
+        const resolvedEntries = analysesWithFlags.flatMap(a =>
+          a.transactions.filter(tx => tx.flagged && tx.resolved).map(tx => ({ tx, a }))
+        )
+        const renderRow = (tx: CCTransaction, a: CCMonthlyAnalysis) => (
+          <div key={tx.id} className={`px-4 py-3 border-b border-slate-700/20 last:border-b-0 transition-opacity ${tx.resolved ? 'opacity-40' : ''}`}>
+            <div className="flex items-start gap-3">
+              <button
+                onClick={() => updateCCTransaction(a.id, tx.id, { resolved: !tx.resolved })}
+                className={`mt-0.5 flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors ${tx.resolved ? 'bg-emerald-600 border-emerald-600' : 'border-slate-600 hover:border-emerald-500'}`}
+                title={tx.resolved ? 'Mark unresolved' : 'Mark resolved'}
+              >
+                {tx.resolved && (
+                  <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </button>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-sm truncate ${tx.resolved ? 'line-through text-slate-500' : 'text-slate-300'}`}>{tx.description}</span>
+                  <span className="text-xs text-slate-600 flex-shrink-0">{tx.date}</span>
+                  <span className="text-xs text-slate-700 flex-shrink-0 bg-slate-700/50 px-1.5 py-0.5 rounded">{a.month}</span>
+                  {tx.person && (
+                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${tx.person === 'Bryan' ? 'bg-violet-900/50 text-violet-300' : 'bg-pink-900/50 text-pink-300'}`}>{tx.person}</span>
+                  )}
+                </div>
+                <div className="mt-2">
+                  {editingNoteTxId === tx.id ? (
+                    <textarea
+                      autoFocus
+                      className="w-full bg-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 border border-slate-600 focus:border-blue-500 outline-none resize-none"
+                      rows={2}
+                      value={noteDraft}
+                      onChange={e => setNoteDraft(e.target.value)}
+                      onBlur={() => {
+                        updateCCTransaction(a.id, tx.id, { note: noteDraft.trim() })
+                        setEditingNoteTxId(null)
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === 'Escape') setEditingNoteTxId(null)
+                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                          updateCCTransaction(a.id, tx.id, { note: noteDraft.trim() })
+                          setEditingNoteTxId(null)
+                        }
+                      }}
+                      placeholder="Add a note..."
+                    />
+                  ) : (
+                    <button
+                      onClick={() => { setEditingNoteTxId(tx.id); setNoteDraft(tx.note ?? '') }}
+                      className={`text-xs text-left w-full transition-colors ${tx.note ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-500'}`}
+                    >
+                      {tx.note || 'Add a note...'}
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0 mt-0.5">
+                <span className="text-sm font-medium text-slate-300 tabular-nums">{fmt(tx.amount)}</span>
+                <button
+                  onClick={() => updateCCTransaction(a.id, tx.id, { flagged: false, resolved: false, note: '' })}
+                  title="Unflag"
+                  className="text-amber-400 hover:text-slate-500 transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5 fill-amber-400" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0z" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+        return (
+          <div className="space-y-3">
+            {totalFlaggedCount === 0 ? (
+              <div className="text-center py-20 text-slate-500 text-sm">No flagged transactions yet.<br /><span className="text-slate-600 text-xs mt-1 block">Use the flag icon on any transaction to track it here.</span></div>
+            ) : (
+              <>
+                {unresolvedEntries.length > 0 && (
+                  <div className="bg-slate-800 rounded-xl overflow-hidden">
+                    {unresolvedEntries.map(({ tx, a }) => renderRow(tx, a))}
+                  </div>
+                )}
+                {resolvedEntries.length > 0 && (
+                  <div className="bg-slate-800 rounded-xl overflow-hidden">
+                    <div className="px-4 py-2 border-b border-slate-700/30">
+                      <span className="text-xs text-slate-600 uppercase tracking-widest">Resolved</span>
+                    </div>
+                    {resolvedEntries.map(({ tx, a }) => renderRow(tx, a))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* Summary totals + two-column body — results only */}
+      {view === 'results' && <><div className="grid grid-cols-3 gap-3">
         <div className="bg-slate-800 rounded-xl p-4">
           <div className="text-xs text-slate-500 mb-1">Total Spend</div>
           <div className="text-xl font-bold text-white tabular-nums">{fmt(totalSpend)}</div>
@@ -637,6 +751,7 @@ export function CCModule() {
       </div>
 
       </div>{/* end two-column grid */}
+      </>}{/* end results view */}
     </div>
   )
 }
