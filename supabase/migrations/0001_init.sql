@@ -44,7 +44,10 @@ create policy "own profile update" on public.profiles for update using (id = aut
 
 create policy "household members can read"
   on public.households for select
-  using (id = (select household_id from public.profiles where id = auth.uid()));
+  using (
+    id = (select household_id from public.profiles where id = auth.uid())
+    or created_by = auth.uid()
+  );
 
 create policy "authed users can create households"
   on public.households for insert
