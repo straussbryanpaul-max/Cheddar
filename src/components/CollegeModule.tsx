@@ -17,7 +17,7 @@ function yearsUntil(freshmanStartYear: number): number {
   return Math.max(0, freshmanStartYear - new Date().getFullYear())
 }
 
-function FVRow({ row, wealthAccounts, years }: {
+function FVCard({ row, wealthAccounts, years }: {
   row: CollegeFVAccount
   wealthAccounts: WealthAccount[]
   years: number
@@ -31,70 +31,78 @@ function FVRow({ row, wealthAccounts, years }: {
   const fv = computeFV(pv, row.annualRate, row.annualContribution, row.periodsPerYear, years)
 
   return (
-    <tr className="border-b border-slate-700/40">
-      <td className="py-1.5 pr-2">
+    <div className="bg-slate-700/30 rounded-lg border border-slate-700/50 p-2.5 space-y-2">
+      <div className="flex items-center gap-2">
         <input
-          className={inputCls}
+          className={`${inputCls} flex-1`}
           value={row.name}
           onChange={e => updateCollegeFVAccount(row.id, { name: e.target.value })}
-          placeholder="Account"
+          placeholder="Account name"
         />
-      </td>
-      <td className="py-1.5 px-2">
-        {linked ? (
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-slate-300 tabular-nums">{fmt(linked.balance)}</span>
-            <button
-              type="button"
-              onClick={() => updateCollegeFVAccount(row.id, { linkedAccountId: null })}
-              className="text-slate-600 hover:text-red-400 text-xs"
-              title="Unlink"
-            >⊗</button>
-          </div>
-        ) : (
-          <input
-            className={inputCls}
-            value={row.presentValue === 0 ? '' : row.presentValue}
-            onChange={e => updateCollegeFVAccount(row.id, { presentValue: parseFloat(e.target.value) || 0 })}
-            placeholder="$0"
-          />
-        )}
-      </td>
-      <td className="py-1.5 px-2">
-        <div className="flex items-center gap-1">
-          <input
-            className={inputCls}
-            value={row.annualRate === 0 ? '' : (row.annualRate * 100).toFixed(row.annualRate * 100 % 1 === 0 ? 0 : 1)}
-            onChange={e => updateCollegeFVAccount(row.id, { annualRate: (parseFloat(e.target.value) || 0) / 100 })}
-            placeholder="6"
-          />
-          <span className="text-slate-500 text-xs">%</span>
-        </div>
-      </td>
-      <td className="py-1.5 px-2">
-        <input
-          className={inputCls}
-          value={row.annualContribution === 0 ? '' : row.annualContribution}
-          onChange={e => updateCollegeFVAccount(row.id, { annualContribution: parseFloat(e.target.value) || 0 })}
-          placeholder="$0"
-        />
-      </td>
-      <td className="py-1.5 pl-2 text-right tabular-nums text-emerald-300 text-xs font-medium whitespace-nowrap">
-        {fmt(fv)}
-      </td>
-      <td className="py-1.5 pl-1 w-6">
         <button
           type="button"
           onClick={() => deleteCollegeFVAccount(row.id)}
-          className="text-slate-500 hover:text-red-400 transition-colors"
+          className="text-slate-500 hover:text-red-400 transition-colors flex-shrink-0"
           title="Remove"
         >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
-      </td>
-    </tr>
+      </div>
+
+      <div className="grid grid-cols-3 gap-1.5">
+        <div>
+          <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">PV</div>
+          {linked ? (
+            <div className="flex items-center gap-1 px-2 py-1 rounded bg-slate-700/40 border border-slate-700">
+              <span className="text-xs text-slate-300 tabular-nums truncate">{fmt(linked.balance)}</span>
+              <button
+                type="button"
+                onClick={() => updateCollegeFVAccount(row.id, { linkedAccountId: null })}
+                className="text-slate-600 hover:text-red-400 text-xs ml-auto"
+                title="Unlink"
+              >⊗</button>
+            </div>
+          ) : (
+            <input
+              className={inputCls}
+              value={row.presentValue === 0 ? '' : row.presentValue}
+              onChange={e => updateCollegeFVAccount(row.id, { presentValue: parseFloat(e.target.value) || 0 })}
+              placeholder="$0"
+            />
+          )}
+        </div>
+        <div>
+          <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Rate</div>
+          <div className="relative">
+            <input
+              className={`${inputCls} pr-5`}
+              value={row.annualRate === 0 ? '' : (row.annualRate * 100).toFixed(row.annualRate * 100 % 1 === 0 ? 0 : 1)}
+              onChange={e => updateCollegeFVAccount(row.id, { annualRate: (parseFloat(e.target.value) || 0) / 100 })}
+              placeholder="6"
+            />
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs pointer-events-none">%</span>
+          </div>
+        </div>
+        <div>
+          <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Contrib/yr</div>
+          <input
+            className={inputCls}
+            value={row.annualContribution === 0 ? '' : row.annualContribution}
+            onChange={e => updateCollegeFVAccount(row.id, { annualContribution: parseFloat(e.target.value) || 0 })}
+            placeholder="$0"
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between border-t border-slate-700/60 pt-1.5">
+        <span className="text-[10px] text-slate-500 uppercase tracking-widest">
+          FV {years > 0 ? `(${years}yr)` : '(now)'}
+        </span>
+        <span className="text-sm font-bold text-emerald-300 tabular-nums">{fmt(fv)}</span>
+      </div>
+    </div>
   )
 }
 
@@ -135,32 +143,19 @@ function FVSection({ kid }: { kid: CollegeKid }) {
           No accounts yet — tag a 529 to {kid.name} in the Savings tab, or add manually below.
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-[10px] text-slate-500 uppercase tracking-widest border-b border-slate-700/50">
-                <th className="text-left pb-1.5 pr-2 font-normal">Account</th>
-                <th className="text-left pb-1.5 px-2 font-normal">PV</th>
-                <th className="text-left pb-1.5 px-2 font-normal">Rate</th>
-                <th className="text-left pb-1.5 px-2 font-normal">Contrib/yr</th>
-                <th className="text-right pb-1.5 pl-2 font-normal">FV</th>
-                <th className="pb-1.5 pl-1 w-6" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(r => (
-                <FVRow key={r.id} row={r} wealthAccounts={wealthAccounts} years={years} />
-              ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colSpan={4} className="pt-2 text-[10px] text-slate-500 uppercase tracking-widest">Total</td>
-                <td className="pt-2 text-right tabular-nums text-emerald-300 text-sm font-bold">{fmt(totalFV)}</td>
-                <td />
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+        <>
+          <div className="space-y-2">
+            {rows.map(r => (
+              <FVCard key={r.id} row={r} wealthAccounts={wealthAccounts} years={years} />
+            ))}
+          </div>
+          {rows.length > 1 && (
+            <div className="flex items-center justify-between border-t border-slate-700/60 pt-2">
+              <span className="text-[10px] text-slate-500 uppercase tracking-widest">Total FV</span>
+              <span className="text-base font-bold text-emerald-300 tabular-nums">{fmt(totalFV)}</span>
+            </div>
+          )}
+        </>
       )}
 
       {/* Add buttons */}
