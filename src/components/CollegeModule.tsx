@@ -1,13 +1,217 @@
 import { useState } from 'react'
 import { useStore } from '../store'
-import type { CollegeKid } from '../types'
+import { useFormatCurrency } from '../lib/useFormatCurrency'
+import { computeFV } from '../lib/wealth'
+import type { CollegeKid, CollegeFVAccount, WealthAccount } from '../types'
 
+const inputCls = 'bg-slate-700 text-white text-sm rounded px-2 py-1 border border-slate-600 outline-none focus:border-blue-400 w-full'
 const CLASS_LABELS = ['Fr', 'So', 'Jr', 'Sr']
 
 function yearLabel(start: number, i: number): string {
   const s = start + i
   const e = String((s + 1) % 100).padStart(2, '0')
   return `${s}–${e} (${CLASS_LABELS[i]})`
+}
+
+function yearsUntil(freshmanStartYear: number): number {
+  return Math.max(0, freshmanStartYear - new Date().getFullYear())
+}
+
+function FVRow({ row, wealthAccounts, years }: {
+  row: CollegeFVAccount
+  wealthAccounts: WealthAccount[]
+  years: number
+}) {
+  const fmt = useFormatCurrency()
+  const updateCollegeFVAccount = useStore(s => s.updateCollegeFVAccount)
+  const deleteCollegeFVAccount = useStore(s => s.deleteCollegeFVAccount)
+
+  const linked = row.linkedAccountId ? wealthAccounts.find(a => a.id === row.linkedAccountId) : null
+  const pv = linked?.balance ?? row.presentValue
+  const fv = computeFV(pv, row.annualRate, row.annualContribution, row.periodsPerYear, years)
+
+  return (
+    <tr className="border-b border-slate-700/40">
+      <td className="py-1.5 pr-2">
+        <input
+          className={inputCls}
+          value={row.name}
+          onChange={e => updateCollegeFVAccount(row.id, { name: e.target.value })}
+          placeholder="Account"
+        />
+      </td>
+      <td className="py-1.5 px-2">
+        {linked ? (
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-slate-300 tabular-nums">{fmt(linked.balance)}</span>
+            <button
+              type="button"
+              onClick={() => updateCollegeFVAccount(row.id, { linkedAccountId: null })}
+              className="text-slate-600 hover:text-red-400 text-xs"
+              title="Unlink"
+            >⊗</button>
+          </div>
+        ) : (
+          <input
+            className={inputCls}
+            value={row.presentValue === 0 ? '' : row.presentValue}
+            onChange={e => updateCollegeFVAccount(row.id, { presentValue: parseFloat(e.target.value) || 0 })}
+            placeholder="$0"
+          />
+        )}
+      </td>
+      <td className="py-1.5 px-2">
+        <div className="flex items-center gap-1">
+          <input
+            className={inputCls}
+            value={row.annualRate === 0 ? '' : (row.annualRate * 100).toFixed(row.annualRate * 100 % 1 === 0 ? 0 : 1)}
+            onChange={e => updateCollegeFVAccount(row.id, { annualRate: (parseFloat(e.target.value) || 0) / 100 })}
+            placeholder="6"
+          />
+          <span className="text-slate-500 text-xs">%</span>
+        </div>
+      </td>
+      <td className="py-1.5 px-2">
+        <input
+          className={inputCls}
+          value={row.annualContribution === 0 ? '' : row.annualContribution}
+          onChange={e => updateCollegeFVAccount(row.id, { annualContribution: parseFloat(e.target.value) || 0 })}
+          placeholder="$0"
+        />
+      </td>
+      <td className="py-1.5 pl-2 text-right tabular-nums text-emerald-300 text-xs font-medium whitespace-nowrap">
+        {fmt(fv)}
+      </td>
+      <td className="py-1.5 pl-1 w-6">
+        <button
+          type="button"
+          onClick={() => deleteCollegeFVAccount(row.id)}
+          className="text-slate-500 hover:text-red-400 transition-colors"
+          title="Remove"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </td>
+    </tr>
+  )
+}
+
+function FVSection({ kid }: { kid: CollegeKid }) {
+  const fmt = useFormatCurrency()
+  const fvAccounts = useStore(s => s.collegeFVAccounts)
+  const wealthAccounts = useStore(s => s.wealthAccounts)
+  const addCollegeFVAccount = useStore(s => s.addCollegeFVAccount)
+
+  const rows = fvAccounts.filter(c => c.kidId === kid.id)
+  const years = yearsUntil(kid.freshmanStartYear)
+
+  // 529 accounts tagged to this kid that aren't yet in the FV calc
+  const linkedIds = new Set(rows.map(r => r.linkedAccountId).filter(Boolean))
+  const available = wealthAccounts.filter(a =>
+    a.collegeKidId === kid.id && !linkedIds.has(a.id)
+  )
+
+  const totalFV = rows.reduce((sum, r) => {
+    const linked = r.linkedAccountId ? wealthAccounts.find(a => a.id === r.linkedAccountId) : null
+    const pv = linked?.balance ?? r.presentValue
+    return sum + computeFV(pv, r.annualRate, r.annualContribution, r.periodsPerYear, years)
+  }, 0)
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between">
+        <div className="text-xs text-slate-500 uppercase tracking-widest">FV Calculator</div>
+        <div className="text-xs text-slate-500">
+          {years > 0
+            ? <>at start of <span className="text-slate-300 tabular-nums">{kid.freshmanStartYear}</span> · <span className="text-slate-300">{years}yr</span></>
+            : <span className="text-slate-400">in college now</span>}
+        </div>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="text-xs text-slate-600 italic px-1 py-2">
+          No accounts yet — tag a 529 to {kid.name} in the Savings tab, or add manually below.
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-[10px] text-slate-500 uppercase tracking-widest border-b border-slate-700/50">
+                <th className="text-left pb-1.5 pr-2 font-normal">Account</th>
+                <th className="text-left pb-1.5 px-2 font-normal">PV</th>
+                <th className="text-left pb-1.5 px-2 font-normal">Rate</th>
+                <th className="text-left pb-1.5 px-2 font-normal">Contrib/yr</th>
+                <th className="text-right pb-1.5 pl-2 font-normal">FV</th>
+                <th className="pb-1.5 pl-1 w-6" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => (
+                <FVRow key={r.id} row={r} wealthAccounts={wealthAccounts} years={years} />
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={4} className="pt-2 text-[10px] text-slate-500 uppercase tracking-widest">Total</td>
+                <td className="pt-2 text-right tabular-nums text-emerald-300 text-sm font-bold">{fmt(totalFV)}</td>
+                <td />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+
+      {/* Add buttons */}
+      <div className="space-y-1.5 pt-1">
+        {available.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {available.map(a => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => addCollegeFVAccount({
+                  kidId: kid.id,
+                  name: `${a.institution} ${a.name}`.trim(),
+                  linkedAccountId: a.id,
+                  presentValue: a.balance,
+                  annualRate: 0.06,
+                  annualContribution: 0,
+                  periodsPerYear: 1,
+                })}
+                className="flex items-center gap-1 text-xs bg-slate-700/60 hover:bg-slate-600 text-slate-300 rounded-lg px-2.5 py-1 transition-colors"
+                title="Add to FV calc"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                {a.institution} {a.name}
+              </button>
+            ))}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => addCollegeFVAccount({
+            kidId: kid.id,
+            name: '',
+            linkedAccountId: null,
+            presentValue: 0,
+            annualRate: 0.06,
+            annualContribution: 0,
+            periodsPerYear: 1,
+          })}
+          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-emerald-400 transition-colors py-0.5"
+        >
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          Add manually
+        </button>
+      </div>
+    </div>
+  )
 }
 
 function KidColumn({ kid }: { kid: CollegeKid }) {
@@ -88,16 +292,20 @@ function KidColumn({ kid }: { kid: CollegeKid }) {
         </button>
       </div>
 
-      <div className="px-5 py-4 space-y-2">
-        <div className="text-xs text-slate-500 uppercase tracking-widest mb-2">4-year plan</div>
-        <ul className="space-y-1">
-          {[0, 1, 2, 3].map(i => (
-            <li key={i} className="text-sm text-slate-500 px-2 py-1 rounded bg-slate-700/20 tabular-nums">
-              {yearLabel(kid.freshmanStartYear, i)}
-            </li>
-          ))}
-        </ul>
-        <div className="text-xs text-slate-600 italic pt-2">FV calculator + forecast coming next…</div>
+      <div className="px-5 py-4 space-y-5">
+        <FVSection kid={kid} />
+
+        <div>
+          <div className="text-xs text-slate-500 uppercase tracking-widest mb-2">4-year plan</div>
+          <ul className="space-y-1">
+            {[0, 1, 2, 3].map(i => (
+              <li key={i} className="text-sm text-slate-500 px-2 py-1 rounded bg-slate-700/20 tabular-nums">
+                {yearLabel(kid.freshmanStartYear, i)}
+              </li>
+            ))}
+          </ul>
+          <div className="text-xs text-slate-600 italic pt-2">Forecast table coming next…</div>
+        </div>
       </div>
     </div>
   )

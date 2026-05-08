@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, AccountAdjustment, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan, CCMonthlyAnalysis, CCTransaction, CCMerchantMemory, MerchantMemoryEntry, CollegeKid } from '../types'
+import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, AccountAdjustment, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan, CCMonthlyAnalysis, CCTransaction, CCMerchantMemory, MerchantMemoryEntry, CollegeKid, CollegeFVAccount } from '../types'
 import { nextPeriodStart, prevPeriodStart, billIncludedInPeriod } from '../lib/periods'
 
 interface State {
@@ -97,6 +97,11 @@ interface State {
   addCollegeKid: (kid: Omit<CollegeKid, 'id'>) => void
   updateCollegeKid: (id: string, updates: Partial<CollegeKid>) => void
   deleteCollegeKid: (id: string) => void
+
+  collegeFVAccounts: CollegeFVAccount[]
+  addCollegeFVAccount: (a: Omit<CollegeFVAccount, 'id'>) => void
+  updateCollegeFVAccount: (id: string, updates: Partial<CollegeFVAccount>) => void
+  deleteCollegeFVAccount: (id: string) => void
 }
 
 function uid() {
@@ -223,6 +228,7 @@ export const useStore = create<State>()(
       projectionSnapshots: [],
       retirementPlan: { expenses: [], socialSecurityAnnual: 0, portfolioReturnRate: 0.05, savingsSource: 'accounts', snapshotId: null, snapshotMilestone: null, useSnapshotActual: false },
       collegeKids: SEED_COLLEGE_KIDS,
+      collegeFVAccounts: [],
 
       setPaySettings: (s) => {
         set(state => ({
@@ -457,6 +463,7 @@ export const useStore = create<State>()(
           projectionSnapshots: [],
           retirementPlan: { expenses: [], socialSecurityAnnual: 0, portfolioReturnRate: 0.05, savingsSource: 'accounts', snapshotId: null, snapshotMilestone: null, useSnapshotActual: false },
           collegeKids: SEED_COLLEGE_KIDS,
+          collegeFVAccounts: [],
         }),
 
       resetPeriod: (periodId) =>
@@ -480,6 +487,9 @@ export const useStore = create<State>()(
           wealthAccounts: s.wealthAccounts.filter(a => a.id !== id),
           accountAdjustments: s.accountAdjustments.filter(a => a.accountId !== id),
           projectionCalcAccounts: s.projectionCalcAccounts.map(c =>
+            c.linkedAccountId === id ? { ...c, linkedAccountId: null } : c
+          ),
+          collegeFVAccounts: s.collegeFVAccounts.map(c =>
             c.linkedAccountId === id ? { ...c, linkedAccountId: null } : c
           ),
         })),
@@ -531,7 +541,15 @@ export const useStore = create<State>()(
           wealthAccounts: s.wealthAccounts.map(a =>
             a.collegeKidId === id ? { ...a, collegeKidId: null } : a
           ),
+          collegeFVAccounts: s.collegeFVAccounts.filter(c => c.kidId !== id),
         })),
+
+      addCollegeFVAccount: (a) =>
+        set(s => ({ collegeFVAccounts: [...s.collegeFVAccounts, { ...a, id: uid() }] })),
+      updateCollegeFVAccount: (id, updates) =>
+        set(s => ({ collegeFVAccounts: s.collegeFVAccounts.map(c => c.id === id ? { ...c, ...updates } : c) })),
+      deleteCollegeFVAccount: (id) =>
+        set(s => ({ collegeFVAccounts: s.collegeFVAccounts.filter(c => c.id !== id) })),
     }),
     {
       name: 'cheddar-store-v4',
@@ -560,6 +578,7 @@ export const useStore = create<State>()(
           projectionSnapshots: p.projectionSnapshots ?? [],
           retirementPlan: { ...c.retirementPlan, ...(p.retirementPlan ?? {}) },
           collegeKids: (p.collegeKids && p.collegeKids.length > 0) ? p.collegeKids : c.collegeKids,
+          collegeFVAccounts: p.collegeFVAccounts ?? [],
         }
       },
     }

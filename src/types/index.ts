@@ -193,3 +193,14 @@ export interface CollegeKid {
   name: string
   freshmanStartYear: number   // calendar year freshman year begins (e.g. 2027)
 }
+
+export interface CollegeFVAccount {
+  id: string
+  kidId: string
+  name: string
+  linkedAccountId: string | null   // optional link to a WealthAccount
+  presentValue: number
+  annualRate: number
+  annualContribution: number
+  periodsPerYear: number
+}

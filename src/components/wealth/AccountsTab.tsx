@@ -23,6 +23,7 @@ interface FormState {
   balanceDate: string
   notes: string
   includeInProjections: boolean
+  collegeKidId: string | null
 }
 
 function defaultForm(a?: WealthAccount): FormState {
@@ -35,6 +36,7 @@ function defaultForm(a?: WealthAccount): FormState {
     balanceDate: a?.balanceDate ?? today(),
     notes: a?.notes ?? '',
     includeInProjections: a?.includeInProjections ?? false,
+    collegeKidId: a?.collegeKidId ?? null,
   }
 }
 
@@ -44,6 +46,7 @@ function AccountForm({ initial, onSave, onCancel, showProjections }: {
   onCancel: () => void
   showProjections?: boolean
 }) {
+  const collegeKids = useStore(s => s.collegeKids)
   const [form, setForm] = useState(initial)
   const set = (patch: Partial<FormState>) => setForm(f => ({ ...f, ...patch }))
 
@@ -52,6 +55,8 @@ function AccountForm({ initial, onSave, onCancel, showProjections }: {
     if (!form.institution.trim() && !form.name.trim()) return
     onSave(form)
   }
+
+  const showKidPicker = form.category === 'college'
 
   return (
     <form onSubmit={submit} className="bg-slate-700/40 rounded-lg p-3 border border-slate-600 space-y-2 my-1">
@@ -63,12 +68,34 @@ function AccountForm({ initial, onSave, onCancel, showProjections }: {
         <select className={selectCls} value={form.type} onChange={e => set({ type: e.target.value as AccountType })}>
           {Object.entries(ACCOUNT_TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
-        <select className={selectCls} value={form.category} onChange={e => set({ category: e.target.value as AccountCategory })}>
+        <select
+          className={selectCls}
+          value={form.category}
+          onChange={e => {
+            const next = e.target.value as AccountCategory
+            set({ category: next, ...(next === 'college' ? {} : { collegeKidId: null }) })
+          }}
+        >
           {Object.entries(ACCOUNT_CATEGORY_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
         <input className={`${inputCls} w-28 text-right`} placeholder="Balance" value={form.balance} onChange={e => set({ balance: e.target.value })} />
         <input type="date" className={inputCls} value={form.balanceDate} onChange={e => set({ balanceDate: e.target.value })} />
       </div>
+      {showKidPicker && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-400">College kid:</span>
+          <select
+            className={selectCls}
+            value={form.collegeKidId ?? ''}
+            onChange={e => set({ collegeKidId: e.target.value || null })}
+          >
+            <option value="">— Unassigned —</option>
+            {collegeKids.map(k => (
+              <option key={k.id} value={k.id}>{k.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="flex items-center gap-3">
         <input className={`${inputCls} flex-1`} placeholder="Notes (optional)" value={form.notes} onChange={e => set({ notes: e.target.value })} />
         {showProjections && (
@@ -155,6 +182,8 @@ function AccountRow({ account, adjustments }: {
   const updateWealthAccount = useStore(s => s.updateWealthAccount)
   const deleteWealthAccount = useStore(s => s.deleteWealthAccount)
   const deleteAccountAdjustment = useStore(s => s.deleteAccountAdjustment)
+  const collegeKids = useStore(s => s.collegeKids)
+  const linkedKid = account.collegeKidId ? collegeKids.find(k => k.id === account.collegeKidId) : null
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
   const [addingAdj, setAddingAdj] = useState(false)
@@ -181,6 +210,7 @@ function AccountRow({ account, adjustments }: {
       balanceDate: form.balanceDate,
       notes: form.notes.trim(),
       includeInProjections: form.includeInProjections,
+      collegeKidId: form.category === 'college' ? form.collegeKidId : null,
     })
     setEditing(false)
   }
@@ -214,6 +244,11 @@ function AccountRow({ account, adjustments }: {
             <span className="text-xs bg-slate-700/70 text-slate-400 rounded px-1.5 py-0.5 hidden sm:inline">
               {ACCOUNT_TYPE_LABELS[account.type] ?? account.type}
             </span>
+            {linkedKid && (
+              <span className="text-xs bg-purple-900/40 text-purple-300 rounded px-1.5 py-0.5 hidden sm:inline" title="Tagged to college kid">
+                {linkedKid.name}
+              </span>
+            )}
           </button>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -381,7 +416,7 @@ export function AccountsTab() {
       balanceDate: form.balanceDate,
       notes: form.notes.trim(),
       includeInProjections: form.includeInProjections,
-      collegeKidId: null,
+      collegeKidId: form.category === 'college' ? form.collegeKidId : null,
     })
     setAdding(false)
   }
