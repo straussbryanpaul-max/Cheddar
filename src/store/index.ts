@@ -112,6 +112,7 @@ interface State {
   addCollegeContributionLine: (yearId: string) => void
   updateCollegeContributionLine: (yearId: string, lineId: string, updates: Partial<CollegeContributionLine>) => void
   deleteCollegeContributionLine: (yearId: string, lineId: string) => void
+  copyForecastLinesDown: (yearId: string, kind: 'expense' | 'contribution') => void
 }
 
 function uid() {
@@ -668,6 +669,27 @@ export const useStore = create<State>()(
             }
           ),
         })),
+
+      copyForecastLinesDown: (yearId, kind) =>
+        set(s => {
+          const source = s.collegeForecastYears.find(y => y.id === yearId)
+          if (!source) return {}
+          const targets = new Set(
+            s.collegeForecastYears
+              .filter(y => y.fvAccountId === source.fvAccountId && y.yearIndex > source.yearIndex && !y.closedOut)
+              .map(t => t.id)
+          )
+          if (targets.size === 0) return {}
+          return {
+            collegeForecastYears: s.collegeForecastYears.map(y => {
+              if (!targets.has(y.id)) return y
+              if (kind === 'expense') {
+                return { ...y, expenseLines: [...y.expenseLines, ...source.expenseLines.map(l => ({ ...l, id: uid() }))] }
+              }
+              return { ...y, contributionLines: [...y.contributionLines, ...source.contributionLines.map(l => ({ ...l, id: uid() }))] }
+            }),
+          }
+        }),
     }),
     {
       name: 'cheddar-store-v4',

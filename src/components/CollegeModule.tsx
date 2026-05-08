@@ -434,6 +434,8 @@ function YearCard({
   const updateCollegeForecastYear = useStore(s => s.updateCollegeForecastYear)
   const addCollegeExpenseLine = useStore(s => s.addCollegeExpenseLine)
   const addCollegeContributionLine = useStore(s => s.addCollegeContributionLine)
+  const copyForecastLinesDown = useStore(s => s.copyForecastLinesDown)
+  const canCopyDown = year.yearIndex < 3
 
   const closed = year.closedOut
   const [collapsed, setCollapsed] = useState(closed)
@@ -513,16 +515,31 @@ function YearCard({
                 {year.contributionLines.map(line => (
                   <ContributionLineRow key={line.id} yearId={year.id} line={line} />
                 ))}
-                <button
-                  type="button"
-                  onClick={() => addCollegeContributionLine(year.id)}
-                  className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-emerald-400 transition-colors py-0.5"
-                >
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add contribution
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => addCollegeContributionLine(year.id)}
+                    className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-emerald-400 transition-colors py-0.5"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add contribution
+                  </button>
+                  {canCopyDown && year.contributionLines.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => copyForecastLinesDown(year.id, 'contribution')}
+                      className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-blue-400 transition-colors py-0.5"
+                      title="Append a copy of these lines to all later non-closed years"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                      </svg>
+                      Copy to later years
+                    </button>
+                  )}
+                </div>
               </>
             )}
           </div>
@@ -548,16 +565,31 @@ function YearCard({
                 {year.expenseLines.map(line => (
                   <ExpenseLineRow key={line.id} yearId={year.id} line={line} />
                 ))}
-                <button
-                  type="button"
-                  onClick={() => addCollegeExpenseLine(year.id, 'tuition')}
-                  className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-emerald-400 transition-colors py-0.5"
-                >
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add expense
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => addCollegeExpenseLine(year.id, 'tuition')}
+                    className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-emerald-400 transition-colors py-0.5"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add expense
+                  </button>
+                  {canCopyDown && year.expenseLines.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => copyForecastLinesDown(year.id, 'expense')}
+                      className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-blue-400 transition-colors py-0.5"
+                      title="Append a copy of these lines to all later non-closed years"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                      </svg>
+                      Copy to later years
+                    </button>
+                  )}
+                </div>
               </>
             )}
           </div>
