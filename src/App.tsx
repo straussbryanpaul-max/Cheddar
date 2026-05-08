@@ -8,6 +8,7 @@ import { QuickLinks } from './components/QuickLinks'
 import { Charts } from './components/Charts'
 import { StatementPanel } from './components/StatementPanel'
 import { CCModule } from './components/CCModule'
+import { CollegeModule } from './components/CollegeModule'
 import { formatDate, periodEndDate, buildProjectedOpenings } from './lib/periods'
 
 type Module = 'budget' | 'savings' | 'college' | 'bills' | 'cc'
@@ -16,7 +17,7 @@ const MODULES: { id: Module; label: string; soon?: boolean }[] = [
   { id: 'budget',  label: 'Budget' },
   { id: 'savings', label: 'Savings & Retirement' },
   { id: 'cc',      label: 'Credit Card' },
-  { id: 'college', label: 'College', soon: true },
+  { id: 'college', label: 'College' },
 ]
 
 const GRID_COLS: Record<number, string> = {
@@ -25,16 +26,6 @@ const GRID_COLS: Record<number, string> = {
   3: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
   4: 'grid-cols-2 xl:grid-cols-4',
   5: 'grid-cols-2 xl:grid-cols-5',
-}
-
-function ComingSoon({ label }: { label: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-32 text-center">
-      <div className="text-4xl mb-4">🚧</div>
-      <div className="text-slate-300 font-semibold text-lg">{label}</div>
-      <div className="text-slate-500 text-sm mt-1">Coming soon</div>
-    </div>
-  )
 }
 
 export default function App() {
@@ -175,7 +166,7 @@ export default function App() {
           {module === 'bills'   && <BillsManager />}
           {module === 'savings' && <WealthModule />}
           {module === 'cc'      && <CCModule />}
-          {module === 'college' && <ComingSoon label="College" />}
+          {module === 'college' && <CollegeModule />}
 
           {module === 'budget' && (
             <>

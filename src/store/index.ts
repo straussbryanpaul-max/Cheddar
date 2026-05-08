@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, AccountAdjustment, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan, CCMonthlyAnalysis, CCTransaction, CCMerchantMemory, MerchantMemoryEntry } from '../types'
+import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, AccountAdjustment, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan, CCMonthlyAnalysis, CCTransaction, CCMerchantMemory, MerchantMemoryEntry, CollegeKid } from '../types'
 import { nextPeriodStart, prevPeriodStart, billIncludedInPeriod } from '../lib/periods'
 
 interface State {
@@ -89,6 +89,12 @@ interface State {
   addRetirementExpense: (e: Omit<RetirementExpense, 'id'>) => void
   updateRetirementExpense: (id: string, updates: Partial<RetirementExpense>) => void
   deleteRetirementExpense: (id: string) => void
+
+  // College module
+  collegeKids: CollegeKid[]
+  addCollegeKid: (kid: Omit<CollegeKid, 'id'>) => void
+  updateCollegeKid: (id: string, updates: Partial<CollegeKid>) => void
+  deleteCollegeKid: (id: string) => void
 }
 
 function uid() {
@@ -123,22 +129,28 @@ const SEED_BILLS: Bill[] = [
 ]
 
 const SEED_WEALTH_ACCOUNTS: WealthAccount[] = [
-  { id: 'wa1',  institution: 'Spec', name: 'Safety Net',         type: 'money_market',    category: 'emergency',  balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false },
-  { id: 'wa2',  institution: 'Spec', name: 'Travel',             type: 'money_market',    category: 'spending',   balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false },
-  { id: 'wa3',  institution: 'Spec', name: 'Emergency Repair',   type: 'money_market',    category: 'emergency',  balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false },
-  { id: 'wa4',  institution: 'Spec', name: 'Planned Updates',    type: 'money_market',    category: 'emergency',  balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false },
-  { id: 'wa5',  institution: 'Spec', name: 'Miscellaneous',      type: 'money_market',    category: 'spending',   balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false },
-  { id: 'wa6',  institution: 'Spec', name: 'Available to Invest',type: 'money_market',    category: 'investment', balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false },
-  { id: 'wa7',  institution: 'Spec', name: 'CD',                 type: 'cd',              category: 'spending',   balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false },
-  { id: 'wa8',  institution: 'Spec', name: 'Kids',               type: 'savings',         category: 'kids',       balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false },
-  { id: 'wa9',  institution: 'Wells',name: 'Savings',            type: 'savings',         category: 'emergency',  balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false },
-  { id: 'wa10', institution: 'Chuck',name: 'Rachel Roth',        type: 'roth_ira',        category: 'retirement', balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: true },
-  { id: 'wa11', institution: 'Chuck',name: 'Bryan Roth',         type: 'roth_ira',        category: 'retirement', balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: true },
-  { id: 'wa12', institution: 'Chuck',name: 'IRA',                type: 'traditional_ira', category: 'retirement', balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: true },
-  { id: 'wa13', institution: 'Chuck',name: 'Brokerage',          type: 'brokerage',       category: 'retirement', balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: true },
-  { id: 'wa14', institution: 'Company', name: 'Trust & Thrift',  type: '401k',            category: 'retirement', balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: true },
-  { id: 'wa15', institution: 'Public',  name: 'E-Account',       type: 'brokerage',       category: 'investment', balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false },
-  { id: 'wa16', institution: 'Texas College Savings', name: '529', type: '529',           category: 'college',    balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false },
+  { id: 'wa1',  institution: 'Spec', name: 'Safety Net',         type: 'money_market',    category: 'emergency',  balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false, collegeKidId: null },
+  { id: 'wa2',  institution: 'Spec', name: 'Travel',             type: 'money_market',    category: 'spending',   balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false, collegeKidId: null },
+  { id: 'wa3',  institution: 'Spec', name: 'Emergency Repair',   type: 'money_market',    category: 'emergency',  balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false, collegeKidId: null },
+  { id: 'wa4',  institution: 'Spec', name: 'Planned Updates',    type: 'money_market',    category: 'emergency',  balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false, collegeKidId: null },
+  { id: 'wa5',  institution: 'Spec', name: 'Miscellaneous',      type: 'money_market',    category: 'spending',   balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false, collegeKidId: null },
+  { id: 'wa6',  institution: 'Spec', name: 'Available to Invest',type: 'money_market',    category: 'investment', balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false, collegeKidId: null },
+  { id: 'wa7',  institution: 'Spec', name: 'CD',                 type: 'cd',              category: 'spending',   balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false, collegeKidId: null },
+  { id: 'wa8',  institution: 'Spec', name: 'Kids',               type: 'savings',         category: 'kids',       balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false, collegeKidId: null },
+  { id: 'wa9',  institution: 'Wells',name: 'Savings',            type: 'savings',         category: 'emergency',  balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false, collegeKidId: null },
+  { id: 'wa10', institution: 'Chuck',name: 'Rachel Roth',        type: 'roth_ira',        category: 'retirement', balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: true, collegeKidId: null },
+  { id: 'wa11', institution: 'Chuck',name: 'Bryan Roth',         type: 'roth_ira',        category: 'retirement', balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: true, collegeKidId: null },
+  { id: 'wa12', institution: 'Chuck',name: 'IRA',                type: 'traditional_ira', category: 'retirement', balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: true, collegeKidId: null },
+  { id: 'wa13', institution: 'Chuck',name: 'Brokerage',          type: 'brokerage',       category: 'retirement', balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: true, collegeKidId: null },
+  { id: 'wa14', institution: 'Company', name: 'Trust & Thrift',  type: '401k',            category: 'retirement', balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: true, collegeKidId: null },
+  { id: 'wa15', institution: 'Public',  name: 'E-Account',       type: 'brokerage',       category: 'investment', balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false, collegeKidId: null },
+  { id: 'wa16', institution: 'Texas College Savings', name: '529', type: '529',           category: 'college',    balance: 1, balanceDate: '2026-05-01', notes: '', includeInProjections: false, collegeKidId: null },
+]
+
+const SEED_COLLEGE_KIDS: CollegeKid[] = [
+  { id: 'ck1', name: 'Kid 1', freshmanStartYear: 2026 },
+  { id: 'ck2', name: 'Kid 2', freshmanStartYear: 2030 },
+  { id: 'ck3', name: 'Kid 3', freshmanStartYear: 2034 },
 ]
 
 const DEFAULT_PAY_AMOUNT = 6400
@@ -207,6 +219,7 @@ export const useStore = create<State>()(
       projectionCalcAccounts: [],
       projectionSnapshots: [],
       retirementPlan: { expenses: [], socialSecurityAnnual: 0, portfolioReturnRate: 0.05, savingsSource: 'accounts', snapshotId: null, snapshotMilestone: null, useSnapshotActual: false },
+      collegeKids: SEED_COLLEGE_KIDS,
 
       setPaySettings: (s) => {
         set(state => ({
@@ -439,6 +452,7 @@ export const useStore = create<State>()(
           projectionCalcAccounts: [],
           projectionSnapshots: [],
           retirementPlan: { expenses: [], socialSecurityAnnual: 0, portfolioReturnRate: 0.05, savingsSource: 'accounts', snapshotId: null, snapshotMilestone: null, useSnapshotActual: false },
+          collegeKids: SEED_COLLEGE_KIDS,
         }),
 
       resetPeriod: (periodId) =>
@@ -502,6 +516,18 @@ export const useStore = create<State>()(
         set(s => ({ retirementPlan: { ...s.retirementPlan, expenses: s.retirementPlan.expenses.map(e => e.id === id ? { ...e, ...updates } : e) } })),
       deleteRetirementExpense: (id) =>
         set(s => ({ retirementPlan: { ...s.retirementPlan, expenses: s.retirementPlan.expenses.filter(e => e.id !== id) } })),
+
+      addCollegeKid: (kid) =>
+        set(s => ({ collegeKids: [...s.collegeKids, { ...kid, id: uid() }] })),
+      updateCollegeKid: (id, updates) =>
+        set(s => ({ collegeKids: s.collegeKids.map(k => k.id === id ? { ...k, ...updates } : k) })),
+      deleteCollegeKid: (id) =>
+        set(s => ({
+          collegeKids: s.collegeKids.filter(k => k.id !== id),
+          wealthAccounts: s.wealthAccounts.map(a =>
+            a.collegeKidId === id ? { ...a, collegeKidId: null } : a
+          ),
+        })),
     }),
     {
       name: 'cheddar-store-v4',
@@ -521,11 +547,14 @@ export const useStore = create<State>()(
           periodActuals: p.periodActuals ?? [],
           ccAnalyses: p.ccAnalyses ?? [],
           ccMerchantMemory: p.ccMerchantMemory ?? {},
-          wealthAccounts: (p.wealthAccounts && p.wealthAccounts.length > 0) ? p.wealthAccounts : c.wealthAccounts,
+          wealthAccounts: (p.wealthAccounts && p.wealthAccounts.length > 0)
+            ? p.wealthAccounts.map(a => ({ ...a, collegeKidId: a.collegeKidId ?? null }))
+            : c.wealthAccounts,
           accountAdjustments: p.accountAdjustments ?? [],
           projectionCalcAccounts: p.projectionCalcAccounts ?? [],
           projectionSnapshots: p.projectionSnapshots ?? [],
           retirementPlan: { ...c.retirementPlan, ...(p.retirementPlan ?? {}) },
+          collegeKids: (p.collegeKids && p.collegeKids.length > 0) ? p.collegeKids : c.collegeKids,
         }
       },
     }

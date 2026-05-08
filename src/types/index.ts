@@ -129,6 +129,7 @@ export interface WealthAccount {
   balanceDate: string
   notes: string
   includeInProjections: boolean
+  collegeKidId: string | null   // when category=college / type=529, links to a kid
 }
 
 export type AccountAdjustmentType = 'actual' | 'forecast'
@@ -183,4 +184,12 @@ export interface RetirementPlan {
   snapshotId: string | null
   snapshotMilestone: SnapshotMilestoneLabel | null
   useSnapshotActual: boolean
+}
+
+// ─── College ─────────────────────────────────────────────────────────────────
+
+export interface CollegeKid {
+  id: string
+  name: string
+  freshmanStartYear: number   // calendar year freshman year begins (e.g. 2027)
 }

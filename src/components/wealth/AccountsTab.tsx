@@ -381,6 +381,7 @@ export function AccountsTab() {
       balanceDate: form.balanceDate,
       notes: form.notes.trim(),
       includeInProjections: form.includeInProjections,
+      collegeKidId: null,
     })
     setAdding(false)
   }
