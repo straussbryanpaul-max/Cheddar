@@ -9,10 +9,14 @@ const CLASS_LABELS = ['Fr', 'So', 'Jr', 'Sr']
 
 const EXPENSE_CATEGORIES: { value: CollegeExpenseCategory; label: string }[] = [
   { value: 'tuition',          label: 'Tuition' },
+  { value: 'fees',             label: 'Fees' },
   { value: 'room_board',       label: 'Room & Board' },
   { value: 'meal_plan',        label: 'Meal Plan' },
   { value: 'books',            label: 'Books & Supplies' },
-  { value: 'fees',             label: 'Fees' },
+  { value: 'rent',             label: 'Rent' },
+  { value: 'utilities',        label: 'Utilities' },
+  { value: 'groceries',        label: 'Groceries' },
+  { value: 'transportation',   label: 'Transportation' },
   { value: 'travel',           label: 'Travel' },
   { value: 'health_insurance', label: 'Health Insurance' },
   { value: 'personal',         label: 'Personal' },
@@ -20,17 +24,50 @@ const EXPENSE_CATEGORIES: { value: CollegeExpenseCategory; label: string }[] = [
   { value: 'custom',           label: 'Custom…' },
 ]
 
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
 function yearLabel(start: number, i: number): string {
   const s = start + i
   const e = String((s + 1) % 100).padStart(2, '0')
   return `${s}–${e} (${CLASS_LABELS[i]})`
 }
 
-function computeYearForecast(begin: number, rate: number, contribution: number, expenses: number) {
-  const netFlow = contribution - expenses
-  const growth = begin * rate + netFlow * rate * 0.5
-  const end = begin + growth + netFlow
-  return { growth, end }
+// True if the line's [startMonth, startMonth + months) range covers the given calendar month (1-12), wrapping past Dec.
+function lineCoversCalendarMonth(line: CollegeExpenseLine, calendarMonth: number): boolean {
+  const start = ((line.startMonth - 1) % 12 + 12) % 12   // 0-11
+  const target = ((calendarMonth - 1) % 12 + 12) % 12    // 0-11
+  const span = Math.max(1, Math.min(12, line.months || 1))
+  const offset = (target - start + 12) % 12
+  return offset < span
+}
+
+// Walk the academic year (Aug → Jul) one calendar month at a time with monthly compounding.
+// Contribution is split evenly across 12 months. Expense lines fire in their start month and continue for `months` months.
+function computeYearForecast(
+  beginBalance: number,
+  annualRate: number,
+  contribution: number,
+  expenseLines: CollegeExpenseLine[],
+) {
+  const monthlyRate = annualRate / 12
+  const monthlyContribution = contribution / 12
+  let balance = beginBalance
+  let totalGrowth = 0
+  let totalExpenses = 0
+  for (let m = 0; m < 12; m++) {
+    const calendarMonth = ((7 + m) % 12) + 1   // m=0 → 8 (Aug), m=5 → 1 (Jan), m=11 → 7 (Jul)
+    balance += monthlyContribution
+    for (const line of expenseLines) {
+      if (lineCoversCalendarMonth(line, calendarMonth)) {
+        balance -= line.amount
+        totalExpenses += line.amount
+      }
+    }
+    const growthThisMonth = balance * monthlyRate
+    balance += growthThisMonth
+    totalGrowth += growthThisMonth
+  }
+  return { growth: totalGrowth, end: balance, totalExpenses }
 }
 
 function yearsUntil(freshmanStartYear: number): number {
@@ -230,44 +267,81 @@ function FVSection({ kid }: { kid: CollegeKid }) {
 }
 
 function ExpenseLineRow({ yearId, line }: { yearId: string; line: CollegeExpenseLine }) {
+  const fmt = useFormatCurrency()
   const updateCollegeExpenseLine = useStore(s => s.updateCollegeExpenseLine)
   const deleteCollegeExpenseLine = useStore(s => s.deleteCollegeExpenseLine)
 
+  const months = Math.max(1, line.months || 1)
+  const total = line.amount * months
+  const fieldCls = 'bg-slate-700 text-white text-xs rounded px-1.5 py-1 border border-slate-600 outline-none focus:border-blue-400'
+
   return (
-    <div className="flex items-center gap-1.5">
-      <select
-        className="bg-slate-700 text-white text-xs rounded px-1.5 py-1 border border-slate-600 outline-none focus:border-blue-400 flex-1 min-w-0"
-        value={line.category}
-        onChange={e => updateCollegeExpenseLine(yearId, line.id, { category: e.target.value as CollegeExpenseCategory })}
-      >
-        {EXPENSE_CATEGORIES.map(c => (
-          <option key={c.value} value={c.value}>{c.label}</option>
-        ))}
-      </select>
-      {line.category === 'custom' && (
+    <div className="space-y-1 bg-slate-700/20 rounded px-1.5 py-1.5 border border-slate-700/40">
+      <div className="flex items-center gap-1.5">
+        <select
+          className={`${fieldCls} flex-1 min-w-0`}
+          value={line.category}
+          onChange={e => updateCollegeExpenseLine(yearId, line.id, { category: e.target.value as CollegeExpenseCategory })}
+        >
+          {EXPENSE_CATEGORIES.map(c => (
+            <option key={c.value} value={c.value}>{c.label}</option>
+          ))}
+        </select>
+        {line.category === 'custom' && (
+          <input
+            className={`${fieldCls} flex-1 min-w-0`}
+            value={line.customLabel}
+            onChange={e => updateCollegeExpenseLine(yearId, line.id, { customLabel: e.target.value })}
+            placeholder="Label"
+          />
+        )}
+        <button
+          type="button"
+          onClick={() => deleteCollegeExpenseLine(yearId, line.id)}
+          className="text-slate-600 hover:text-red-400 transition-colors flex-shrink-0"
+          title="Remove"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div className="flex items-center gap-1 text-[11px] text-slate-400">
+        <select
+          className={`${fieldCls} w-[68px]`}
+          value={line.startMonth}
+          onChange={e => updateCollegeExpenseLine(yearId, line.id, { startMonth: parseInt(e.target.value) })}
+          title="Start month"
+        >
+          {MONTHS_SHORT.map((m, i) => (
+            <option key={i} value={i + 1}>{m}</option>
+          ))}
+        </select>
+        <span className="text-slate-500">×</span>
         <input
-          className="bg-slate-700 text-white text-xs rounded px-1.5 py-1 border border-slate-600 outline-none focus:border-blue-400 flex-1 min-w-0"
-          value={line.customLabel}
-          onChange={e => updateCollegeExpenseLine(yearId, line.id, { customLabel: e.target.value })}
-          placeholder="Label"
+          className={`${fieldCls} w-12 text-right tabular-nums`}
+          type="number"
+          min={1}
+          max={12}
+          value={line.months}
+          onChange={e => {
+            const n = parseInt(e.target.value)
+            updateCollegeExpenseLine(yearId, line.id, { months: isNaN(n) ? 1 : Math.max(1, Math.min(12, n)) })
+          }}
+          title="Number of months"
         />
-      )}
-      <input
-        className="bg-slate-700 text-white text-xs rounded px-1.5 py-1 border border-slate-600 outline-none focus:border-blue-400 w-20 tabular-nums text-right"
-        value={line.amount === 0 ? '' : line.amount}
-        onChange={e => updateCollegeExpenseLine(yearId, line.id, { amount: parseFloat(e.target.value) || 0 })}
-        placeholder="$0"
-      />
-      <button
-        type="button"
-        onClick={() => deleteCollegeExpenseLine(yearId, line.id)}
-        className="text-slate-600 hover:text-red-400 transition-colors flex-shrink-0"
-        title="Remove"
-      >
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
+        <span className="text-slate-500">mo</span>
+        <span className="text-slate-500 ml-1">@</span>
+        <input
+          className={`${fieldCls} flex-1 min-w-0 text-right tabular-nums`}
+          value={line.amount === 0 ? '' : line.amount}
+          onChange={e => updateCollegeExpenseLine(yearId, line.id, { amount: parseFloat(e.target.value) || 0 })}
+          placeholder={months > 1 ? '$/mo' : '$0'}
+        />
+        {months > 1 && (
+          <span className="text-slate-500 tabular-nums whitespace-nowrap">= {fmt(total)}</span>
+        )}
+      </div>
     </div>
   )
 }
@@ -284,8 +358,7 @@ function YearCard({
   const updateCollegeForecastYear = useStore(s => s.updateCollegeForecastYear)
   const addCollegeExpenseLine = useStore(s => s.addCollegeExpenseLine)
 
-  const totalExpenses = year.expenseLines.reduce((sum, l) => sum + l.amount, 0)
-  const { growth, end: forecastEnd } = computeYearForecast(beginBalance, rate, year.contribution, totalExpenses)
+  const { growth, end: forecastEnd, totalExpenses } = computeYearForecast(beginBalance, rate, year.contribution, year.expenseLines)
   const variance = year.actualEndBalance !== null ? year.actualEndBalance - forecastEnd : null
 
   return (
@@ -384,8 +457,7 @@ function AccountForecast({ account, kid }: { account: CollegeFVAccount; kid: Col
   let begin = startBalance
   for (const y of years) {
     computed.push({ year: y, begin })
-    const totalExpenses = y.expenseLines.reduce((s, l) => s + l.amount, 0)
-    const { end } = computeYearForecast(begin, account.annualRate, y.contribution, totalExpenses)
+    const { end } = computeYearForecast(begin, account.annualRate, y.contribution, y.expenseLines)
     begin = end
   }
 

@@ -207,13 +207,16 @@ export interface CollegeFVAccount {
 
 export type CollegeExpenseCategory =
   | 'tuition' | 'room_board' | 'meal_plan' | 'books' | 'fees'
+  | 'rent' | 'utilities' | 'groceries' | 'transportation'
   | 'travel' | 'health_insurance' | 'personal' | 'other' | 'custom'
 
 export interface CollegeExpenseLine {
   id: string
   category: CollegeExpenseCategory
-  customLabel: string   // used when category === 'custom'
-  amount: number
+  customLabel: string    // used when category === 'custom'
+  amount: number         // per-month when months > 1, else single-occurrence amount
+  startMonth: number     // 1-12 calendar month
+  months: number         // how many consecutive months it spans, default 1
 }
 
 export interface CollegeForecastYear {

@@ -602,7 +602,7 @@ export const useStore = create<State>()(
               ...y,
               expenseLines: [
                 ...y.expenseLines,
-                { id: uid(), category, customLabel: '', amount: 0 },
+                { id: uid(), category, customLabel: '', amount: 0, startMonth: 8, months: 1 },
               ],
             }
           ),
@@ -658,7 +658,14 @@ export const useStore = create<State>()(
           retirementPlan: { ...c.retirementPlan, ...(p.retirementPlan ?? {}) },
           collegeKids: (p.collegeKids && p.collegeKids.length > 0) ? p.collegeKids : c.collegeKids,
           collegeFVAccounts: p.collegeFVAccounts ?? [],
-          collegeForecastYears: p.collegeForecastYears ?? [],
+          collegeForecastYears: (p.collegeForecastYears ?? []).map(y => ({
+            ...y,
+            expenseLines: y.expenseLines.map(l => ({
+              ...l,
+              startMonth: l.startMonth ?? 8,
+              months: l.months ?? 1,
+            })),
+          })),
         }
       },
     }
