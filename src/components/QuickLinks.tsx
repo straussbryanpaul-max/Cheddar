@@ -91,6 +91,8 @@ function LinkRow({ link, editing, onEdit, onDone }: {
 export function QuickLinks() {
   const quickLinks = useStore(s => s.quickLinks)
   const addQuickLink = useStore(s => s.addQuickLink)
+  const docked = useStore(s => s.quickLinksDocked)
+  const setDocked = useStore(s => s.setQuickLinksDocked)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
@@ -105,10 +107,41 @@ export function QuickLinks() {
     setAdding(false)
   }
 
+  if (docked) {
+    return (
+      <button
+        type="button"
+        onClick={() => setDocked(false)}
+        className="w-7 h-40 rounded-l-xl bg-slate-800/60 border border-slate-700/50 border-r-0 flex flex-col items-center justify-between py-3 hover:bg-slate-700/80 hover:border-slate-600 transition-colors group"
+        title="Open quick links"
+      >
+        <svg className="w-3 h-3 text-slate-500 group-hover:text-slate-300 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+        <span className="text-[10px] tracking-[0.2em] uppercase text-slate-500 group-hover:text-slate-300 font-medium [writing-mode:vertical-rl] rotate-180 transition-colors">
+          Quick Links
+        </span>
+        <svg className="w-3 h-3 text-slate-500 group-hover:text-slate-300 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+    )
+  }
+
   return (
     <div className="bg-slate-800/60 rounded-xl border border-slate-700/50 overflow-hidden">
-      <div className="px-3 py-2.5 border-b border-slate-700/50">
+      <div className="px-3 py-2 border-b border-slate-700/50 flex items-center justify-between gap-2">
         <span className="text-xs text-slate-500 uppercase tracking-widest font-medium">Quick Links</span>
+        <button
+          type="button"
+          onClick={() => setDocked(true)}
+          className="p-1 -mr-1 text-slate-600 hover:text-slate-300 transition-colors"
+          title="Dock"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
       </div>
 
       <div className="p-1.5 space-y-0.5">

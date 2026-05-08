@@ -43,6 +43,7 @@ export default function App() {
   const regeneratePeriods = useStore(s => s.regeneratePeriods)
   const ghostMode = useStore(s => s.ghostMode)
   const setGhostMode = useStore(s => s.setGhostMode)
+  const quickLinksDocked = useStore(s => s.quickLinksDocked)
   const [module, setModule] = useState<Module>('budget')
   const [showStatement, setShowStatement] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
@@ -282,7 +283,7 @@ export default function App() {
           )}
         </main>
 
-        <aside className="w-44 flex-shrink-0 sticky top-20">
+        <aside className={`flex-shrink-0 sticky top-20 transition-[width] duration-200 ${quickLinksDocked ? 'w-7' : 'w-44'}`}>
           <QuickLinks />
         </aside>
       </div>

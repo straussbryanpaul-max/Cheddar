@@ -14,6 +14,7 @@ interface State {
   quickLinks: QuickLink[]
   periodsVisible: number
   periodsWindowDate: string | null   // startDate of first visible period; null = current
+  quickLinksDocked: boolean          // true = collapsed to edge handle; false = pinned open
   periodActuals: PeriodActuals[]
   anthropicApiKey: string
   ghostMode: boolean
@@ -28,6 +29,7 @@ interface State {
   deleteQuickLink: (id: string) => void
   setPeriodsVisible: (n: number) => void
   setPeriodsWindowDate: (date: string | null) => void
+  setQuickLinksDocked: (docked: boolean) => void
 
   addBill: (bill: Omit<Bill, 'id'>) => void
   updateBill: (id: string, updates: Partial<Bill>) => void
@@ -209,6 +211,7 @@ export const useStore = create<State>()(
       quickLinks: SEED_QUICK_LINKS,
       periodsVisible: 2,
       periodsWindowDate: null,
+      quickLinksDocked: true,
       periodActuals: [],
       ccAnalyses: [],
       ccMerchantMemory: {},
@@ -360,6 +363,7 @@ export const useStore = create<State>()(
 
       setPeriodsVisible: (n) => set({ periodsVisible: n }),
       setPeriodsWindowDate: (date) => set({ periodsWindowDate: date }),
+      setQuickLinksDocked: (docked) => set({ quickLinksDocked: docked }),
 
       setPeriodActuals: (periodId, entries, statementRange) =>
         set(s => ({
@@ -543,6 +547,7 @@ export const useStore = create<State>()(
           payFrequency: p.payFrequency ?? c.payFrequency,
           payAnchorDate: p.payAnchorDate ?? c.payAnchorDate,
           periodsWindowDate: p.periodsWindowDate ?? null,
+          quickLinksDocked: p.quickLinksDocked ?? c.quickLinksDocked,
           ghostMode: false,
           periodActuals: p.periodActuals ?? [],
           ccAnalyses: p.ccAnalyses ?? [],
