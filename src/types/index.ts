@@ -204,3 +204,23 @@ export interface CollegeFVAccount {
   annualContribution: number
   periodsPerYear: number
 }
+
+export type CollegeExpenseCategory =
+  | 'tuition' | 'room_board' | 'meal_plan' | 'books' | 'fees'
+  | 'travel' | 'health_insurance' | 'personal' | 'other' | 'custom'
+
+export interface CollegeExpenseLine {
+  id: string
+  category: CollegeExpenseCategory
+  customLabel: string   // used when category === 'custom'
+  amount: number
+}
+
+export interface CollegeForecastYear {
+  id: string                // `${fvAccountId}:${yearIndex}`
+  fvAccountId: string
+  yearIndex: 0 | 1 | 2 | 3  // Fr, So, Jr, Sr
+  contribution: number
+  expenseLines: CollegeExpenseLine[]
+  actualEndBalance: number | null
+}

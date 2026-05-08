@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, AccountAdjustment, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan, CCMonthlyAnalysis, CCTransaction, CCMerchantMemory, MerchantMemoryEntry, CollegeKid, CollegeFVAccount } from '../types'
+import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, AccountAdjustment, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan, CCMonthlyAnalysis, CCTransaction, CCMerchantMemory, MerchantMemoryEntry, CollegeKid, CollegeFVAccount, CollegeForecastYear, CollegeExpenseLine, CollegeExpenseCategory } from '../types'
 import { nextPeriodStart, prevPeriodStart, billIncludedInPeriod } from '../lib/periods'
 
 interface State {
@@ -102,6 +102,13 @@ interface State {
   addCollegeFVAccount: (a: Omit<CollegeFVAccount, 'id'>) => void
   updateCollegeFVAccount: (id: string, updates: Partial<CollegeFVAccount>) => void
   deleteCollegeFVAccount: (id: string) => void
+
+  collegeForecastYears: CollegeForecastYear[]
+  ensureCollegeForecastYears: (fvAccountId: string) => void
+  updateCollegeForecastYear: (id: string, updates: Partial<CollegeForecastYear>) => void
+  addCollegeExpenseLine: (yearId: string, category: CollegeExpenseCategory) => void
+  updateCollegeExpenseLine: (yearId: string, lineId: string, updates: Partial<CollegeExpenseLine>) => void
+  deleteCollegeExpenseLine: (yearId: string, lineId: string) => void
 }
 
 function uid() {
@@ -229,6 +236,7 @@ export const useStore = create<State>()(
       retirementPlan: { expenses: [], socialSecurityAnnual: 0, portfolioReturnRate: 0.05, savingsSource: 'accounts', snapshotId: null, snapshotMilestone: null, useSnapshotActual: false },
       collegeKids: SEED_COLLEGE_KIDS,
       collegeFVAccounts: [],
+      collegeForecastYears: [],
 
       setPaySettings: (s) => {
         set(state => ({
@@ -464,6 +472,7 @@ export const useStore = create<State>()(
           retirementPlan: { expenses: [], socialSecurityAnnual: 0, portfolioReturnRate: 0.05, savingsSource: 'accounts', snapshotId: null, snapshotMilestone: null, useSnapshotActual: false },
           collegeKids: SEED_COLLEGE_KIDS,
           collegeFVAccounts: [],
+          collegeForecastYears: [],
         }),
 
       resetPeriod: (periodId) =>
@@ -536,20 +545,90 @@ export const useStore = create<State>()(
       updateCollegeKid: (id, updates) =>
         set(s => ({ collegeKids: s.collegeKids.map(k => k.id === id ? { ...k, ...updates } : k) })),
       deleteCollegeKid: (id) =>
-        set(s => ({
-          collegeKids: s.collegeKids.filter(k => k.id !== id),
-          wealthAccounts: s.wealthAccounts.map(a =>
-            a.collegeKidId === id ? { ...a, collegeKidId: null } : a
-          ),
-          collegeFVAccounts: s.collegeFVAccounts.filter(c => c.kidId !== id),
-        })),
+        set(s => {
+          const removedFVIds = new Set(s.collegeFVAccounts.filter(c => c.kidId === id).map(c => c.id))
+          return {
+            collegeKids: s.collegeKids.filter(k => k.id !== id),
+            wealthAccounts: s.wealthAccounts.map(a =>
+              a.collegeKidId === id ? { ...a, collegeKidId: null } : a
+            ),
+            collegeFVAccounts: s.collegeFVAccounts.filter(c => c.kidId !== id),
+            collegeForecastYears: s.collegeForecastYears.filter(y => !removedFVIds.has(y.fvAccountId)),
+          }
+        }),
 
       addCollegeFVAccount: (a) =>
         set(s => ({ collegeFVAccounts: [...s.collegeFVAccounts, { ...a, id: uid() }] })),
       updateCollegeFVAccount: (id, updates) =>
         set(s => ({ collegeFVAccounts: s.collegeFVAccounts.map(c => c.id === id ? { ...c, ...updates } : c) })),
       deleteCollegeFVAccount: (id) =>
-        set(s => ({ collegeFVAccounts: s.collegeFVAccounts.filter(c => c.id !== id) })),
+        set(s => ({
+          collegeFVAccounts: s.collegeFVAccounts.filter(c => c.id !== id),
+          collegeForecastYears: s.collegeForecastYears.filter(y => y.fvAccountId !== id),
+        })),
+
+      ensureCollegeForecastYears: (fvAccountId) => {
+        const existing = get().collegeForecastYears.filter(y => y.fvAccountId === fvAccountId)
+        const existingIdx = new Set(existing.map(y => y.yearIndex))
+        const toAdd: CollegeForecastYear[] = []
+        for (const i of [0, 1, 2, 3] as const) {
+          if (!existingIdx.has(i)) {
+            toAdd.push({
+              id: `${fvAccountId}:${i}`,
+              fvAccountId,
+              yearIndex: i,
+              contribution: 0,
+              expenseLines: [],
+              actualEndBalance: null,
+            })
+          }
+        }
+        if (toAdd.length > 0) {
+          set(s => ({ collegeForecastYears: [...s.collegeForecastYears, ...toAdd] }))
+        }
+      },
+
+      updateCollegeForecastYear: (id, updates) =>
+        set(s => ({
+          collegeForecastYears: s.collegeForecastYears.map(y =>
+            y.id === id ? { ...y, ...updates } : y
+          ),
+        })),
+
+      addCollegeExpenseLine: (yearId, category) =>
+        set(s => ({
+          collegeForecastYears: s.collegeForecastYears.map(y =>
+            y.id !== yearId ? y : {
+              ...y,
+              expenseLines: [
+                ...y.expenseLines,
+                { id: uid(), category, customLabel: '', amount: 0 },
+              ],
+            }
+          ),
+        })),
+
+      updateCollegeExpenseLine: (yearId, lineId, updates) =>
+        set(s => ({
+          collegeForecastYears: s.collegeForecastYears.map(y =>
+            y.id !== yearId ? y : {
+              ...y,
+              expenseLines: y.expenseLines.map(l =>
+                l.id === lineId ? { ...l, ...updates } : l
+              ),
+            }
+          ),
+        })),
+
+      deleteCollegeExpenseLine: (yearId, lineId) =>
+        set(s => ({
+          collegeForecastYears: s.collegeForecastYears.map(y =>
+            y.id !== yearId ? y : {
+              ...y,
+              expenseLines: y.expenseLines.filter(l => l.id !== lineId),
+            }
+          ),
+        })),
     }),
     {
       name: 'cheddar-store-v4',
@@ -579,6 +658,7 @@ export const useStore = create<State>()(
           retirementPlan: { ...c.retirementPlan, ...(p.retirementPlan ?? {}) },
           collegeKids: (p.collegeKids && p.collegeKids.length > 0) ? p.collegeKids : c.collegeKids,
           collegeFVAccounts: p.collegeFVAccounts ?? [],
+          collegeForecastYears: p.collegeForecastYears ?? [],
         }
       },
     }

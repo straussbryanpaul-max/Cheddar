@@ -1,16 +1,36 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { useFormatCurrency } from '../lib/useFormatCurrency'
 import { computeFV } from '../lib/wealth'
-import type { CollegeKid, CollegeFVAccount, WealthAccount } from '../types'
+import type { CollegeKid, CollegeFVAccount, WealthAccount, CollegeForecastYear, CollegeExpenseLine, CollegeExpenseCategory } from '../types'
 
 const inputCls = 'bg-slate-700 text-white text-sm rounded px-2 py-1 border border-slate-600 outline-none focus:border-blue-400 w-full'
 const CLASS_LABELS = ['Fr', 'So', 'Jr', 'Sr']
+
+const EXPENSE_CATEGORIES: { value: CollegeExpenseCategory; label: string }[] = [
+  { value: 'tuition',          label: 'Tuition' },
+  { value: 'room_board',       label: 'Room & Board' },
+  { value: 'meal_plan',        label: 'Meal Plan' },
+  { value: 'books',            label: 'Books & Supplies' },
+  { value: 'fees',             label: 'Fees' },
+  { value: 'travel',           label: 'Travel' },
+  { value: 'health_insurance', label: 'Health Insurance' },
+  { value: 'personal',         label: 'Personal' },
+  { value: 'other',            label: 'Other' },
+  { value: 'custom',           label: 'Custom…' },
+]
 
 function yearLabel(start: number, i: number): string {
   const s = start + i
   const e = String((s + 1) % 100).padStart(2, '0')
   return `${s}–${e} (${CLASS_LABELS[i]})`
+}
+
+function computeYearForecast(begin: number, rate: number, contribution: number, expenses: number) {
+  const netFlow = contribution - expenses
+  const growth = begin * rate + netFlow * rate * 0.5
+  const end = begin + growth + netFlow
+  return { growth, end }
 }
 
 function yearsUntil(freshmanStartYear: number): number {
@@ -209,6 +229,211 @@ function FVSection({ kid }: { kid: CollegeKid }) {
   )
 }
 
+function ExpenseLineRow({ yearId, line }: { yearId: string; line: CollegeExpenseLine }) {
+  const updateCollegeExpenseLine = useStore(s => s.updateCollegeExpenseLine)
+  const deleteCollegeExpenseLine = useStore(s => s.deleteCollegeExpenseLine)
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <select
+        className="bg-slate-700 text-white text-xs rounded px-1.5 py-1 border border-slate-600 outline-none focus:border-blue-400 flex-1 min-w-0"
+        value={line.category}
+        onChange={e => updateCollegeExpenseLine(yearId, line.id, { category: e.target.value as CollegeExpenseCategory })}
+      >
+        {EXPENSE_CATEGORIES.map(c => (
+          <option key={c.value} value={c.value}>{c.label}</option>
+        ))}
+      </select>
+      {line.category === 'custom' && (
+        <input
+          className="bg-slate-700 text-white text-xs rounded px-1.5 py-1 border border-slate-600 outline-none focus:border-blue-400 flex-1 min-w-0"
+          value={line.customLabel}
+          onChange={e => updateCollegeExpenseLine(yearId, line.id, { customLabel: e.target.value })}
+          placeholder="Label"
+        />
+      )}
+      <input
+        className="bg-slate-700 text-white text-xs rounded px-1.5 py-1 border border-slate-600 outline-none focus:border-blue-400 w-20 tabular-nums text-right"
+        value={line.amount === 0 ? '' : line.amount}
+        onChange={e => updateCollegeExpenseLine(yearId, line.id, { amount: parseFloat(e.target.value) || 0 })}
+        placeholder="$0"
+      />
+      <button
+        type="button"
+        onClick={() => deleteCollegeExpenseLine(yearId, line.id)}
+        className="text-slate-600 hover:text-red-400 transition-colors flex-shrink-0"
+        title="Remove"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  )
+}
+
+function YearCard({
+  year, beginBalance, rate, freshmanStartYear,
+}: {
+  year: CollegeForecastYear
+  beginBalance: number
+  rate: number
+  freshmanStartYear: number
+}) {
+  const fmt = useFormatCurrency()
+  const updateCollegeForecastYear = useStore(s => s.updateCollegeForecastYear)
+  const addCollegeExpenseLine = useStore(s => s.addCollegeExpenseLine)
+
+  const totalExpenses = year.expenseLines.reduce((sum, l) => sum + l.amount, 0)
+  const { growth, end: forecastEnd } = computeYearForecast(beginBalance, rate, year.contribution, totalExpenses)
+  const variance = year.actualEndBalance !== null ? year.actualEndBalance - forecastEnd : null
+
+  return (
+    <div className="bg-slate-700/30 rounded-lg border border-slate-700/50 p-2.5 space-y-2">
+      <div className="flex items-baseline justify-between">
+        <span className="text-xs font-semibold text-slate-300 tabular-nums">
+          {yearLabel(freshmanStartYear, year.yearIndex)}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+        <span className="text-slate-500">Begin</span>
+        <span className="text-slate-300 tabular-nums text-right">{fmt(beginBalance)}</span>
+
+        <span className="text-slate-500">Contribution</span>
+        <input
+          className="bg-slate-700 text-white text-xs rounded px-1.5 py-0.5 border border-slate-600 outline-none focus:border-blue-400 tabular-nums text-right w-full"
+          value={year.contribution === 0 ? '' : year.contribution}
+          onChange={e => updateCollegeForecastYear(year.id, { contribution: parseFloat(e.target.value) || 0 })}
+          placeholder="$0"
+        />
+
+        <span className="text-slate-500">Growth</span>
+        <span className="text-slate-300 tabular-nums text-right">{fmt(growth)}</span>
+      </div>
+
+      <div className="space-y-1 pt-1 border-t border-slate-700/60">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-slate-500 uppercase tracking-wider">Expenses</span>
+          <span className="text-xs text-slate-400 tabular-nums">{fmt(totalExpenses)}</span>
+        </div>
+        {year.expenseLines.map(line => (
+          <ExpenseLineRow key={line.id} yearId={year.id} line={line} />
+        ))}
+        <button
+          type="button"
+          onClick={() => addCollegeExpenseLine(year.id, 'tuition')}
+          className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-emerald-400 transition-colors py-0.5"
+        >
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          Add expense
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs pt-1 border-t border-slate-700/60">
+        <span className="text-slate-400 font-medium">Forecast end</span>
+        <span className="text-emerald-300 tabular-nums text-right font-semibold">{fmt(forecastEnd)}</span>
+
+        <span className="text-slate-500">Actual end</span>
+        <input
+          className="bg-slate-700 text-white text-xs rounded px-1.5 py-0.5 border border-slate-600 outline-none focus:border-blue-400 tabular-nums text-right w-full"
+          value={year.actualEndBalance === null ? '' : year.actualEndBalance}
+          onChange={e => {
+            const v = e.target.value
+            updateCollegeForecastYear(year.id, { actualEndBalance: v === '' ? null : (parseFloat(v) || 0) })
+          }}
+          placeholder="—"
+        />
+
+        <span className="text-slate-500">Variance</span>
+        <span className={`tabular-nums text-right ${
+          variance === null ? 'text-slate-600'
+            : variance >= 0 ? 'text-emerald-300' : 'text-red-300'
+        }`}>
+          {variance === null ? '—' : `${variance >= 0 ? '+' : ''}${fmt(variance)}`}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function AccountForecast({ account, kid }: { account: CollegeFVAccount; kid: CollegeKid }) {
+  const wealthAccounts = useStore(s => s.wealthAccounts)
+  const forecastYears = useStore(s => s.collegeForecastYears)
+  const ensureCollegeForecastYears = useStore(s => s.ensureCollegeForecastYears)
+
+  useEffect(() => {
+    ensureCollegeForecastYears(account.id)
+  }, [account.id, ensureCollegeForecastYears])
+
+  const linked = account.linkedAccountId ? wealthAccounts.find(a => a.id === account.linkedAccountId) : null
+  const pv = linked?.balance ?? account.presentValue
+  const yearsUntilFreshman = Math.max(0, kid.freshmanStartYear - new Date().getFullYear())
+  const startBalance = computeFV(pv, account.annualRate, account.annualContribution, account.periodsPerYear, yearsUntilFreshman)
+
+  const years = [0, 1, 2, 3]
+    .map(i => forecastYears.find(y => y.fvAccountId === account.id && y.yearIndex === i))
+    .filter((y): y is CollegeForecastYear => Boolean(y))
+
+  if (years.length < 4) return null  // ensure hasn't completed yet
+
+  // Walk forward year by year so each year's begin = previous end
+  const computed: { year: CollegeForecastYear; begin: number }[] = []
+  let begin = startBalance
+  for (const y of years) {
+    computed.push({ year: y, begin })
+    const totalExpenses = y.expenseLines.reduce((s, l) => s + l.amount, 0)
+    const { end } = computeYearForecast(begin, account.annualRate, y.contribution, totalExpenses)
+    begin = end
+  }
+
+  const accountLabel = account.name.trim() || (linked ? `${linked.institution} ${linked.name}` : 'Untitled account')
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between">
+        <span className="text-xs font-medium text-slate-300 truncate">{accountLabel}</span>
+        <span className="text-[10px] text-slate-500 tabular-nums">
+          {(account.annualRate * 100).toFixed(account.annualRate * 100 % 1 === 0 ? 0 : 1)}%
+        </span>
+      </div>
+      <div className="space-y-2">
+        {computed.map(({ year, begin }) => (
+          <YearCard
+            key={year.id}
+            year={year}
+            beginBalance={begin}
+            rate={account.annualRate}
+            freshmanStartYear={kid.freshmanStartYear}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ForecastSection({ kid }: { kid: CollegeKid }) {
+  const fvAccounts = useStore(s => s.collegeFVAccounts)
+  const accounts = fvAccounts.filter(a => a.kidId === kid.id)
+
+  return (
+    <div className="space-y-3">
+      <div className="text-xs text-slate-500 uppercase tracking-widest">Forecast vs Actual</div>
+      {accounts.length === 0 ? (
+        <div className="text-xs text-slate-600 italic px-1 py-2">
+          Add an FV account above to see the 4-year forecast.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {accounts.map(a => <AccountForecast key={a.id} account={a} kid={kid} />)}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function KidColumn({ kid }: { kid: CollegeKid }) {
   const updateCollegeKid = useStore(s => s.updateCollegeKid)
   const deleteCollegeKid = useStore(s => s.deleteCollegeKid)
@@ -289,18 +514,7 @@ function KidColumn({ kid }: { kid: CollegeKid }) {
 
       <div className="px-5 py-4 space-y-5">
         <FVSection kid={kid} />
-
-        <div>
-          <div className="text-xs text-slate-500 uppercase tracking-widest mb-2">4-year plan</div>
-          <ul className="space-y-1">
-            {[0, 1, 2, 3].map(i => (
-              <li key={i} className="text-sm text-slate-500 px-2 py-1 rounded bg-slate-700/20 tabular-nums">
-                {yearLabel(kid.freshmanStartYear, i)}
-              </li>
-            ))}
-          </ul>
-          <div className="text-xs text-slate-600 italic pt-2">Forecast table coming next…</div>
-        </div>
+        <ForecastSection kid={kid} />
       </div>
     </div>
   )
