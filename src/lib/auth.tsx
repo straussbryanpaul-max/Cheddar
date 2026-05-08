@@ -15,7 +15,7 @@ interface AuthContextValue {
   user: User | null
   profile: Profile | null
   loading: boolean
-  signInWithEmail: (email: string) => Promise<{ error?: string }>
+  signInWithPassword: (email: string, password: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
   updateProfile: (updates: Partial<Pick<Profile, 'household_id' | 'anthropic_api_key' | 'ui_prefs'>>) => Promise<void>
@@ -71,11 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user: session?.user ?? null,
     profile,
     loading,
-    signInWithEmail: async (email) => {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: window.location.origin },
-      })
+    signInWithPassword: async (email, password) => {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
       return error ? { error: error.message } : {}
     },
     signOut: async () => {
