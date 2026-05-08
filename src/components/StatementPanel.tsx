@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { useStore } from '../store'
+import { useAuth } from '../lib/auth'
 import { analyzeStatement, type CategorizedTransaction, type StatementAnalysis } from '../lib/analyzeStatement'
 import { formatDate, periodEndDate } from '../lib/periods'
 import { useFormatCurrency } from '../lib/useFormatCurrency'
@@ -39,8 +40,9 @@ export function StatementPanel({ periodId, periodStart, onClose }: Props) {
   const fmt = useFormatCurrency()
   const bills = useStore(s => s.bills)
   const periods = useStore(s => s.periods)
-  const anthropicApiKey = useStore(s => s.anthropicApiKey)
-  const setAnthropicApiKey = useStore(s => s.setAnthropicApiKey)
+  const { profile, updateProfile } = useAuth()
+  const anthropicApiKey = profile?.anthropic_api_key ?? ''
+  const setAnthropicApiKey = (key: string) => { void updateProfile({ anthropic_api_key: key }) }
   const updateBill = useStore(s => s.updateBill)
   const setPeriodActuals = useStore(s => s.setPeriodActuals)
   const payFrequency = useStore(s => s.payFrequency)

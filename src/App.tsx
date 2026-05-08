@@ -9,6 +9,10 @@ import { Charts } from './components/Charts'
 import { StatementPanel } from './components/StatementPanel'
 import { CCModule } from './components/CCModule'
 import { CollegeModule } from './components/CollegeModule'
+import { LoginScreen } from './components/LoginScreen'
+import { HouseholdOnboarding } from './components/HouseholdOnboarding'
+import { useAuth } from './lib/auth'
+import { useHouseholdSync } from './lib/sync'
 import { formatDate, periodEndDate, buildProjectedOpenings } from './lib/periods'
 
 type Module = 'budget' | 'savings' | 'college' | 'bills' | 'cc'
@@ -29,6 +33,24 @@ const GRID_COLS: Record<number, string> = {
 }
 
 export default function App() {
+  const { loading, session, profile } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">
+        <div className="text-sm text-slate-500">Loading…</div>
+      </div>
+    )
+  }
+  if (!session) return <LoginScreen />
+  if (!profile?.household_id) return <HouseholdOnboarding />
+
+  return <BudgetApp householdId={profile.household_id} userId={session.user.id} />
+}
+
+function BudgetApp({ householdId, userId }: { householdId: string; userId: string }) {
+  useHouseholdSync(householdId, userId)
+  const hydrated = useStore(s => s.hydrated)
   const periods = useStore(s => s.periods)
   const ensureFuturePeriods = useStore(s => s.ensureFuturePeriods)
   const ensurePastPeriods = useStore(s => s.ensurePastPeriods)
@@ -49,9 +71,18 @@ export default function App() {
   const [confirmReset, setConfirmReset] = useState(false)
 
   useEffect(() => {
+    if (!hydrated) return
     ensurePastPeriods(8)
     ensureFuturePeriods(8)
-  }, [ensurePastPeriods, ensureFuturePeriods])
+  }, [hydrated, ensurePastPeriods, ensureFuturePeriods])
+
+  if (!hydrated) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">
+        <div className="text-sm text-slate-500">Loading your data…</div>
+      </div>
+    )
+  }
 
   // Find index of the period containing today
   const today = new Date().toISOString().split('T')[0]

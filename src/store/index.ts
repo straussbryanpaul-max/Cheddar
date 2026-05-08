@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
 import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, AccountAdjustment, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan, CCMonthlyAnalysis, CCTransaction, CCMerchantMemory, MerchantMemoryEntry, CollegeKid, CollegeFVAccount, CollegeForecastYear, CollegeExpenseLine, CollegeExpenseCategory, CollegeContributionLine } from '../types'
 import { nextPeriodStart, prevPeriodStart, billIncludedInPeriod } from '../lib/periods'
 
@@ -16,12 +15,10 @@ interface State {
   periodsWindowDate: string | null   // startDate of first visible period; null = current
   quickLinksDocked: boolean          // true = collapsed to edge handle; false = pinned open
   periodActuals: PeriodActuals[]
-  anthropicApiKey: string
   ghostMode: boolean
 
   setPaySettings: (s: { defaultPayAmount?: number; payFrequency?: PayFrequency; payAnchorDate?: string }) => void
   regeneratePeriods: () => void
-  setAnthropicApiKey: (key: string) => void
   setGhostMode: (enabled: boolean) => void
 
   addQuickLink: (link: Omit<QuickLink, 'id'>) => void
@@ -63,6 +60,11 @@ interface State {
 
   resetStore: () => void
   resetPeriod: (periodId: string) => void
+
+  // Sync-layer actions (called by src/lib/sync.ts)
+  hydrate: (data: Partial<State>) => void
+  hydrated: boolean
+  setHydrated: (v: boolean) => void
 
   // Wealth module
   wealthAccounts: WealthAccount[]
@@ -215,8 +217,10 @@ function buildSeedPeriods(
 }
 
 export const useStore = create<State>()(
-  persist(
-    (set, get) => ({
+  (set, get) => ({
+      hydrated: false,
+      setHydrated: (v) => set({ hydrated: v }),
+      hydrate: (data) => set(data as State),
       bills: SEED_BILLS,
       periods: buildSeedPeriods(DEFAULT_PAY_AMOUNT, DEFAULT_PAY_ANCHOR, DEFAULT_PAY_FREQ),
       periodItems: [],
@@ -231,7 +235,6 @@ export const useStore = create<State>()(
       periodActuals: [],
       ccAnalyses: [],
       ccMerchantMemory: {},
-      anthropicApiKey: '',
       ghostMode: false,
       wealthAccounts: SEED_WEALTH_ACCOUNTS,
       accountAdjustments: [],
@@ -256,7 +259,6 @@ export const useStore = create<State>()(
         set({ periods, periodItems: [], extras: [], periodActuals: [], periodsWindowDate: null })
       },
 
-      setAnthropicApiKey: (key) => set({ anthropicApiKey: key }),
       setGhostMode: (enabled) => set({ ghostMode: enabled }),
 
       addBill: (bill) =>
@@ -690,62 +692,5 @@ export const useStore = create<State>()(
             }),
           }
         }),
-    }),
-    {
-      name: 'cheddar-store-v4',
-      merge: (persisted, current) => {
-        const p = persisted as Partial<State>
-        const c = current as State
-        return {
-          ...c,
-          ...p,
-          quickLinks: p.quickLinks ?? c.quickLinks,
-          periodsVisible: p.periodsVisible ?? c.periodsVisible,
-          anthropicApiKey: p.anthropicApiKey ?? c.anthropicApiKey,
-          payFrequency: p.payFrequency ?? c.payFrequency,
-          payAnchorDate: p.payAnchorDate ?? c.payAnchorDate,
-          periodsWindowDate: p.periodsWindowDate ?? null,
-          quickLinksDocked: p.quickLinksDocked ?? c.quickLinksDocked,
-          ghostMode: false,
-          periodActuals: p.periodActuals ?? [],
-          ccAnalyses: p.ccAnalyses ?? [],
-          ccMerchantMemory: p.ccMerchantMemory ?? {},
-          wealthAccounts: (p.wealthAccounts && p.wealthAccounts.length > 0)
-            ? p.wealthAccounts.map(a => ({ ...a, collegeKidId: a.collegeKidId ?? null }))
-            : c.wealthAccounts,
-          accountAdjustments: p.accountAdjustments ?? [],
-          projectionCalcAccounts: p.projectionCalcAccounts ?? [],
-          projectionSnapshots: p.projectionSnapshots ?? [],
-          retirementPlan: { ...c.retirementPlan, ...(p.retirementPlan ?? {}) },
-          collegeKids: (p.collegeKids && p.collegeKids.length > 0) ? p.collegeKids : c.collegeKids,
-          collegeFVAccounts: p.collegeFVAccounts ?? [],
-          collegeForecastYears: (p.collegeForecastYears ?? []).map(y => {
-            const yAny = y as unknown as Partial<CollegeForecastYear> & { contribution?: number }
-            const migratedContribLines: CollegeContributionLine[] = (yAny.contributionLines ?? (
-              yAny.contribution && yAny.contribution > 0
-                ? [{ id: `${y.id}:auto`, label: 'Auto contribution', amount: yAny.contribution / 12, startMonth: 7, months: 12 }]
-                : []
-            ))
-            return {
-              id: y.id,
-              fvAccountId: y.fvAccountId,
-              yearIndex: y.yearIndex,
-              actualEndBalance: y.actualEndBalance ?? null,
-              closedOut: yAny.closedOut ?? false,
-              contributionLines: migratedContribLines.map(l => ({
-                ...l,
-                startMonth: l.startMonth ?? 7,
-                months: l.months ?? 1,
-              })),
-              expenseLines: y.expenseLines.map(l => ({
-                ...l,
-                startMonth: l.startMonth ?? 8,
-                months: l.months ?? 1,
-              })),
-            }
-          }),
-        }
-      },
-    }
-  )
+    })
 )
