@@ -219,11 +219,20 @@ export interface CollegeExpenseLine {
   months: number         // how many consecutive months it spans, default 1
 }
 
+export interface CollegeContributionLine {
+  id: string
+  label: string         // free text e.g. "Auto deposit", "Aunt Mary gift"
+  amount: number        // per-month when months > 1, else single-occurrence
+  startMonth: number    // 1-12 calendar month
+  months: number        // consecutive months it spans, default 1
+}
+
 export interface CollegeForecastYear {
   id: string                // `${fvAccountId}:${yearIndex}`
   fvAccountId: string
   yearIndex: 0 | 1 | 2 | 3  // Fr, So, Jr, Sr
-  contribution: number
+  contributionLines: CollegeContributionLine[]
   expenseLines: CollegeExpenseLine[]
   actualEndBalance: number | null
+  closedOut: boolean
 }

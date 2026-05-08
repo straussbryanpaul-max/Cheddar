@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { useFormatCurrency } from '../lib/useFormatCurrency'
 import { computeFV } from '../lib/wealth'
-import type { CollegeKid, CollegeFVAccount, WealthAccount, CollegeForecastYear, CollegeExpenseLine, CollegeExpenseCategory } from '../types'
+import type { CollegeKid, CollegeFVAccount, WealthAccount, CollegeForecastYear, CollegeExpenseLine, CollegeExpenseCategory, CollegeContributionLine } from '../types'
 
 const inputCls = 'bg-slate-700 text-white text-sm rounded px-2 py-1 border border-slate-600 outline-none focus:border-blue-400 w-full'
 const CLASS_LABELS = ['Fr', 'So', 'Jr', 'Sr']
@@ -29,34 +29,41 @@ const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'S
 function yearLabel(start: number, i: number): string {
   const s = start + i
   const e = String((s + 1) % 100).padStart(2, '0')
-  return `${s}–${e} (${CLASS_LABELS[i]})`
+  return `${s}–${e} (${CLASS_LABELS[i]}) · Jul–Jun`
 }
 
+type MonthlyLine = { startMonth: number; months: number; amount: number }
+
 // True if the line's [startMonth, startMonth + months) range covers the given calendar month (1-12), wrapping past Dec.
-function lineCoversCalendarMonth(line: CollegeExpenseLine, calendarMonth: number): boolean {
-  const start = ((line.startMonth - 1) % 12 + 12) % 12   // 0-11
-  const target = ((calendarMonth - 1) % 12 + 12) % 12    // 0-11
+function lineCoversCalendarMonth(line: MonthlyLine, calendarMonth: number): boolean {
+  const start = ((line.startMonth - 1) % 12 + 12) % 12
+  const target = ((calendarMonth - 1) % 12 + 12) % 12
   const span = Math.max(1, Math.min(12, line.months || 1))
   const offset = (target - start + 12) % 12
   return offset < span
 }
 
-// Walk the academic year (Aug → Jul) one calendar month at a time with monthly compounding.
-// Contribution is split evenly across 12 months. Expense lines fire in their start month and continue for `months` months.
+// Walk the academic year (Jul → Jun) one calendar month at a time with monthly compounding.
+// Contribution and expense lines fire in their start month and continue for `months` months.
 function computeYearForecast(
   beginBalance: number,
   annualRate: number,
-  contribution: number,
+  contributionLines: CollegeContributionLine[],
   expenseLines: CollegeExpenseLine[],
 ) {
   const monthlyRate = annualRate / 12
-  const monthlyContribution = contribution / 12
   let balance = beginBalance
   let totalGrowth = 0
+  let totalContributions = 0
   let totalExpenses = 0
   for (let m = 0; m < 12; m++) {
-    const calendarMonth = ((7 + m) % 12) + 1   // m=0 → 8 (Aug), m=5 → 1 (Jan), m=11 → 7 (Jul)
-    balance += monthlyContribution
+    const calendarMonth = ((6 + m) % 12) + 1   // m=0 → 7 (Jul), m=5 → 12 (Dec), m=11 → 6 (Jun)
+    for (const line of contributionLines) {
+      if (lineCoversCalendarMonth(line, calendarMonth)) {
+        balance += line.amount
+        totalContributions += line.amount
+      }
+    }
     for (const line of expenseLines) {
       if (lineCoversCalendarMonth(line, calendarMonth)) {
         balance -= line.amount
@@ -67,7 +74,7 @@ function computeYearForecast(
     balance += growthThisMonth
     totalGrowth += growthThisMonth
   }
-  return { growth: totalGrowth, end: balance, totalExpenses }
+  return { growth: totalGrowth, end: balance, totalContributions, totalExpenses }
 }
 
 function yearsUntil(freshmanStartYear: number): number {
@@ -346,6 +353,75 @@ function ExpenseLineRow({ yearId, line }: { yearId: string; line: CollegeExpense
   )
 }
 
+function ContributionLineRow({ yearId, line }: { yearId: string; line: CollegeContributionLine }) {
+  const fmt = useFormatCurrency()
+  const updateCollegeContributionLine = useStore(s => s.updateCollegeContributionLine)
+  const deleteCollegeContributionLine = useStore(s => s.deleteCollegeContributionLine)
+
+  const months = Math.max(1, line.months || 1)
+  const total = line.amount * months
+  const fieldCls = 'bg-slate-700 text-white text-xs rounded px-1.5 py-1 border border-slate-600 outline-none focus:border-blue-400'
+
+  return (
+    <div className="space-y-1 bg-slate-700/20 rounded px-1.5 py-1.5 border border-slate-700/40">
+      <div className="flex items-center gap-1.5">
+        <input
+          className={`${fieldCls} flex-1 min-w-0`}
+          value={line.label}
+          onChange={e => updateCollegeContributionLine(yearId, line.id, { label: e.target.value })}
+          placeholder="Label (auto-deposit, gift, …)"
+        />
+        <button
+          type="button"
+          onClick={() => deleteCollegeContributionLine(yearId, line.id)}
+          className="text-slate-600 hover:text-red-400 transition-colors flex-shrink-0"
+          title="Remove"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div className="flex items-center gap-1 text-[11px] text-slate-400">
+        <select
+          className={`${fieldCls} w-[68px]`}
+          value={line.startMonth}
+          onChange={e => updateCollegeContributionLine(yearId, line.id, { startMonth: parseInt(e.target.value) })}
+          title="Start month"
+        >
+          {MONTHS_SHORT.map((m, i) => (
+            <option key={i} value={i + 1}>{m}</option>
+          ))}
+        </select>
+        <span className="text-slate-500">×</span>
+        <input
+          className={`${fieldCls} w-12 text-right tabular-nums`}
+          type="number"
+          min={1}
+          max={12}
+          value={line.months}
+          onChange={e => {
+            const n = parseInt(e.target.value)
+            updateCollegeContributionLine(yearId, line.id, { months: isNaN(n) ? 1 : Math.max(1, Math.min(12, n)) })
+          }}
+          title="Number of months"
+        />
+        <span className="text-slate-500">mo</span>
+        <span className="text-slate-500 ml-1">@</span>
+        <input
+          className={`${fieldCls} flex-1 min-w-0 text-right tabular-nums`}
+          value={line.amount === 0 ? '' : line.amount}
+          onChange={e => updateCollegeContributionLine(yearId, line.id, { amount: parseFloat(e.target.value) || 0 })}
+          placeholder={months > 1 ? '$/mo' : '$0'}
+        />
+        {months > 1 && (
+          <span className="text-emerald-400/80 tabular-nums whitespace-nowrap">= {fmt(total)}</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function YearCard({
   year, beginBalance, rate, freshmanStartYear,
 }: {
@@ -357,77 +433,160 @@ function YearCard({
   const fmt = useFormatCurrency()
   const updateCollegeForecastYear = useStore(s => s.updateCollegeForecastYear)
   const addCollegeExpenseLine = useStore(s => s.addCollegeExpenseLine)
+  const addCollegeContributionLine = useStore(s => s.addCollegeContributionLine)
 
-  const { growth, end: forecastEnd, totalExpenses } = computeYearForecast(beginBalance, rate, year.contribution, year.expenseLines)
+  const closed = year.closedOut
+  const [collapsed, setCollapsed] = useState(closed)
+  const [contribsOpen, setContribsOpen] = useState(true)
+  const [expensesOpen, setExpensesOpen] = useState(true)
+
+  const { growth, end: forecastEnd, totalExpenses, totalContributions } = computeYearForecast(
+    beginBalance, rate, year.contributionLines, year.expenseLines
+  )
   const variance = year.actualEndBalance !== null ? year.actualEndBalance - forecastEnd : null
+  const summaryEnd = closed && year.actualEndBalance !== null ? year.actualEndBalance : forecastEnd
 
   return (
-    <div className="bg-slate-700/30 rounded-lg border border-slate-700/50 p-2.5 space-y-2">
-      <div className="flex items-baseline justify-between">
-        <span className="text-xs font-semibold text-slate-300 tabular-nums">
-          {yearLabel(freshmanStartYear, year.yearIndex)}
-        </span>
-      </div>
-
-      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-        <span className="text-slate-500">Begin</span>
-        <span className="text-slate-300 tabular-nums text-right">{fmt(beginBalance)}</span>
-
-        <span className="text-slate-500">Contribution</span>
-        <input
-          className="bg-slate-700 text-white text-xs rounded px-1.5 py-0.5 border border-slate-600 outline-none focus:border-blue-400 tabular-nums text-right w-full"
-          value={year.contribution === 0 ? '' : year.contribution}
-          onChange={e => updateCollegeForecastYear(year.id, { contribution: parseFloat(e.target.value) || 0 })}
-          placeholder="$0"
-        />
-
-        <span className="text-slate-500">Growth</span>
-        <span className="text-slate-300 tabular-nums text-right">{fmt(growth)}</span>
-      </div>
-
-      <div className="space-y-1 pt-1 border-t border-slate-700/60">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] text-slate-500 uppercase tracking-wider">Expenses</span>
-          <span className="text-xs text-slate-400 tabular-nums">{fmt(totalExpenses)}</span>
-        </div>
-        {year.expenseLines.map(line => (
-          <ExpenseLineRow key={line.id} yearId={year.id} line={line} />
-        ))}
+    <div className={`rounded-lg border ${
+      closed ? 'bg-slate-700/15 border-slate-700/30' : 'bg-slate-700/30 border-slate-700/50'
+    }`}>
+      <div className="px-2.5 py-1.5 flex items-center gap-2">
         <button
           type="button"
-          onClick={() => addCollegeExpenseLine(year.id, 'tuition')}
-          className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-emerald-400 transition-colors py-0.5"
+          onClick={() => setCollapsed(c => !c)}
+          className="text-slate-500 hover:text-slate-300 transition-colors flex-shrink-0"
+          title={collapsed ? 'Expand' : 'Collapse'}
         >
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          <svg className={`w-3.5 h-3.5 transition-transform ${collapsed ? '' : 'rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
-          Add expense
+        </button>
+        <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
+          <span className={`text-xs font-semibold tabular-nums truncate ${closed ? 'text-slate-400' : 'text-slate-300'}`}>
+            {yearLabel(freshmanStartYear, year.yearIndex)}
+          </span>
+          {closed && <span className="text-[10px] text-amber-400/70 uppercase tracking-wider flex-shrink-0">Closed</span>}
+        </div>
+        <span className="text-[11px] text-slate-400 tabular-nums whitespace-nowrap">
+          {fmt(summaryEnd)}
+        </span>
+        <button
+          type="button"
+          onClick={() => updateCollegeForecastYear(year.id, { closedOut: !closed })}
+          className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border transition-colors flex-shrink-0 ${
+            closed
+              ? 'text-amber-300 border-amber-700/40 hover:bg-amber-500/10'
+              : 'text-slate-400 border-slate-700 hover:bg-slate-700'
+          }`}
+        >
+          {closed ? 'Reopen' : 'Close'}
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs pt-1 border-t border-slate-700/60">
-        <span className="text-slate-400 font-medium">Forecast end</span>
-        <span className="text-emerald-300 tabular-nums text-right font-semibold">{fmt(forecastEnd)}</span>
+      {!collapsed && (
+        <div className={`px-2.5 pb-2.5 space-y-2 ${closed ? 'opacity-60 pointer-events-none' : ''}`}>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs pt-1 border-t border-slate-700/60">
+            <span className="text-slate-500">Begin</span>
+            <span className="text-slate-300 tabular-nums text-right">{fmt(beginBalance)}</span>
+            <span className="text-slate-500">Growth</span>
+            <span className="text-slate-300 tabular-nums text-right">{fmt(growth)}</span>
+          </div>
 
-        <span className="text-slate-500">Actual end</span>
-        <input
-          className="bg-slate-700 text-white text-xs rounded px-1.5 py-0.5 border border-slate-600 outline-none focus:border-blue-400 tabular-nums text-right w-full"
-          value={year.actualEndBalance === null ? '' : year.actualEndBalance}
-          onChange={e => {
-            const v = e.target.value
-            updateCollegeForecastYear(year.id, { actualEndBalance: v === '' ? null : (parseFloat(v) || 0) })
-          }}
-          placeholder="—"
-        />
+          <div className="space-y-1 pt-1 border-t border-slate-700/60">
+            <button
+              type="button"
+              onClick={() => setContribsOpen(o => !o)}
+              className="flex items-center justify-between w-full hover:opacity-80 transition-opacity"
+            >
+              <span className="flex items-center gap-1">
+                <svg className={`w-3 h-3 text-slate-500 transition-transform ${contribsOpen ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider">
+                  Contributions{!contribsOpen && year.contributionLines.length > 0 && ` (${year.contributionLines.length})`}
+                </span>
+              </span>
+              <span className="text-xs text-emerald-400 tabular-nums">+{fmt(totalContributions)}</span>
+            </button>
+            {contribsOpen && (
+              <>
+                {year.contributionLines.map(line => (
+                  <ContributionLineRow key={line.id} yearId={year.id} line={line} />
+                ))}
+                <button
+                  type="button"
+                  onClick={() => addCollegeContributionLine(year.id)}
+                  className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-emerald-400 transition-colors py-0.5"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add contribution
+                </button>
+              </>
+            )}
+          </div>
 
-        <span className="text-slate-500">Variance</span>
-        <span className={`tabular-nums text-right ${
-          variance === null ? 'text-slate-600'
-            : variance >= 0 ? 'text-emerald-300' : 'text-red-300'
-        }`}>
-          {variance === null ? '—' : `${variance >= 0 ? '+' : ''}${fmt(variance)}`}
-        </span>
-      </div>
+          <div className="space-y-1 pt-1 border-t border-slate-700/60">
+            <button
+              type="button"
+              onClick={() => setExpensesOpen(o => !o)}
+              className="flex items-center justify-between w-full hover:opacity-80 transition-opacity"
+            >
+              <span className="flex items-center gap-1">
+                <svg className={`w-3 h-3 text-slate-500 transition-transform ${expensesOpen ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider">
+                  Expenses{!expensesOpen && year.expenseLines.length > 0 && ` (${year.expenseLines.length})`}
+                </span>
+              </span>
+              <span className="text-xs text-rose-300/80 tabular-nums">−{fmt(totalExpenses)}</span>
+            </button>
+            {expensesOpen && (
+              <>
+                {year.expenseLines.map(line => (
+                  <ExpenseLineRow key={line.id} yearId={year.id} line={line} />
+                ))}
+                <button
+                  type="button"
+                  onClick={() => addCollegeExpenseLine(year.id, 'tuition')}
+                  className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-emerald-400 transition-colors py-0.5"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add expense
+                </button>
+              </>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs pt-1 border-t border-slate-700/60">
+            <span className="text-slate-400 font-medium">Forecast end</span>
+            <span className="text-emerald-300 tabular-nums text-right font-semibold">{fmt(forecastEnd)}</span>
+
+            <span className="text-slate-500">Actual end</span>
+            <input
+              className="bg-slate-700 text-white text-xs rounded px-1.5 py-0.5 border border-slate-600 outline-none focus:border-blue-400 tabular-nums text-right w-full"
+              value={year.actualEndBalance === null ? '' : year.actualEndBalance}
+              onChange={e => {
+                const v = e.target.value
+                updateCollegeForecastYear(year.id, { actualEndBalance: v === '' ? null : (parseFloat(v) || 0) })
+              }}
+              placeholder="—"
+            />
+
+            <span className="text-slate-500">Variance</span>
+            <span className={`tabular-nums text-right ${
+              variance === null ? 'text-slate-600'
+                : variance >= 0 ? 'text-emerald-300' : 'text-red-300'
+            }`}>
+              {variance === null ? '—' : `${variance >= 0 ? '+' : ''}${fmt(variance)}`}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -452,13 +611,13 @@ function AccountForecast({ account, kid }: { account: CollegeFVAccount; kid: Col
 
   if (years.length < 4) return null  // ensure hasn't completed yet
 
-  // Walk forward year by year so each year's begin = previous end
+  // Walk forward year by year. Begin of next year = prev's actual end (when prev is closed AND has actual), else prev's forecast end.
   const computed: { year: CollegeForecastYear; begin: number }[] = []
   let begin = startBalance
   for (const y of years) {
     computed.push({ year: y, begin })
-    const { end } = computeYearForecast(begin, account.annualRate, y.contribution, y.expenseLines)
-    begin = end
+    const { end } = computeYearForecast(begin, account.annualRate, y.contributionLines, y.expenseLines)
+    begin = (y.closedOut && y.actualEndBalance !== null) ? y.actualEndBalance : end
   }
 
   const accountLabel = account.name.trim() || (linked ? `${linked.institution} ${linked.name}` : 'Untitled account')

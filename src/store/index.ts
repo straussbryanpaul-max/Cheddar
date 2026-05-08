@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, AccountAdjustment, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan, CCMonthlyAnalysis, CCTransaction, CCMerchantMemory, MerchantMemoryEntry, CollegeKid, CollegeFVAccount, CollegeForecastYear, CollegeExpenseLine, CollegeExpenseCategory } from '../types'
+import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, AccountAdjustment, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan, CCMonthlyAnalysis, CCTransaction, CCMerchantMemory, MerchantMemoryEntry, CollegeKid, CollegeFVAccount, CollegeForecastYear, CollegeExpenseLine, CollegeExpenseCategory, CollegeContributionLine } from '../types'
 import { nextPeriodStart, prevPeriodStart, billIncludedInPeriod } from '../lib/periods'
 
 interface State {
@@ -109,6 +109,9 @@ interface State {
   addCollegeExpenseLine: (yearId: string, category: CollegeExpenseCategory) => void
   updateCollegeExpenseLine: (yearId: string, lineId: string, updates: Partial<CollegeExpenseLine>) => void
   deleteCollegeExpenseLine: (yearId: string, lineId: string) => void
+  addCollegeContributionLine: (yearId: string) => void
+  updateCollegeContributionLine: (yearId: string, lineId: string, updates: Partial<CollegeContributionLine>) => void
+  deleteCollegeContributionLine: (yearId: string, lineId: string) => void
 }
 
 function uid() {
@@ -577,9 +580,10 @@ export const useStore = create<State>()(
               id: `${fvAccountId}:${i}`,
               fvAccountId,
               yearIndex: i,
-              contribution: 0,
+              contributionLines: [],
               expenseLines: [],
               actualEndBalance: null,
+              closedOut: false,
             })
           }
         }
@@ -629,6 +633,41 @@ export const useStore = create<State>()(
             }
           ),
         })),
+
+      addCollegeContributionLine: (yearId) =>
+        set(s => ({
+          collegeForecastYears: s.collegeForecastYears.map(y =>
+            y.id !== yearId ? y : {
+              ...y,
+              contributionLines: [
+                ...y.contributionLines,
+                { id: uid(), label: '', amount: 0, startMonth: 7, months: 12 },
+              ],
+            }
+          ),
+        })),
+
+      updateCollegeContributionLine: (yearId, lineId, updates) =>
+        set(s => ({
+          collegeForecastYears: s.collegeForecastYears.map(y =>
+            y.id !== yearId ? y : {
+              ...y,
+              contributionLines: y.contributionLines.map(l =>
+                l.id === lineId ? { ...l, ...updates } : l
+              ),
+            }
+          ),
+        })),
+
+      deleteCollegeContributionLine: (yearId, lineId) =>
+        set(s => ({
+          collegeForecastYears: s.collegeForecastYears.map(y =>
+            y.id !== yearId ? y : {
+              ...y,
+              contributionLines: y.contributionLines.filter(l => l.id !== lineId),
+            }
+          ),
+        })),
     }),
     {
       name: 'cheddar-store-v4',
@@ -658,14 +697,31 @@ export const useStore = create<State>()(
           retirementPlan: { ...c.retirementPlan, ...(p.retirementPlan ?? {}) },
           collegeKids: (p.collegeKids && p.collegeKids.length > 0) ? p.collegeKids : c.collegeKids,
           collegeFVAccounts: p.collegeFVAccounts ?? [],
-          collegeForecastYears: (p.collegeForecastYears ?? []).map(y => ({
-            ...y,
-            expenseLines: y.expenseLines.map(l => ({
-              ...l,
-              startMonth: l.startMonth ?? 8,
-              months: l.months ?? 1,
-            })),
-          })),
+          collegeForecastYears: (p.collegeForecastYears ?? []).map(y => {
+            const yAny = y as unknown as Partial<CollegeForecastYear> & { contribution?: number }
+            const migratedContribLines: CollegeContributionLine[] = (yAny.contributionLines ?? (
+              yAny.contribution && yAny.contribution > 0
+                ? [{ id: `${y.id}:auto`, label: 'Auto contribution', amount: yAny.contribution / 12, startMonth: 7, months: 12 }]
+                : []
+            ))
+            return {
+              id: y.id,
+              fvAccountId: y.fvAccountId,
+              yearIndex: y.yearIndex,
+              actualEndBalance: y.actualEndBalance ?? null,
+              closedOut: yAny.closedOut ?? false,
+              contributionLines: migratedContribLines.map(l => ({
+                ...l,
+                startMonth: l.startMonth ?? 7,
+                months: l.months ?? 1,
+              })),
+              expenseLines: y.expenseLines.map(l => ({
+                ...l,
+                startMonth: l.startMonth ?? 8,
+                months: l.months ?? 1,
+              })),
+            }
+          }),
         }
       },
     }
