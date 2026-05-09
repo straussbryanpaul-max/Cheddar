@@ -236,3 +236,18 @@ export interface CollegeForecastYear {
   actualEndBalance: number | null
   closedOut: boolean
 }
+
+export type AppModule = 'budget' | 'savings' | 'college' | 'bills' | 'cc'
+
+export interface UiPrefs {
+  currentModule: AppModule
+  ccSelectedId: string | null
+  ccRecurringOpen: boolean
+  ccOneOffOpen: boolean
+  ccAllTxOpen: boolean
+  ccExpandedCats: string[]
+  collegeYearUi: Record<string, { collapsed: boolean; contribsOpen: boolean; expensesOpen: boolean }>
+  wealthAccountExpanded: Record<string, boolean>
+  wealthExpandLevel: number
+  periodExpanded: Record<string, boolean>
+}

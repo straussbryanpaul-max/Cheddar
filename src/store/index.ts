@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, AccountAdjustment, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan, CCMonthlyAnalysis, CCTransaction, CCMerchantMemory, MerchantMemoryEntry, CollegeKid, CollegeFVAccount, CollegeForecastYear, CollegeExpenseLine, CollegeExpenseCategory, CollegeContributionLine } from '../types'
+import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, AccountAdjustment, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan, CCMonthlyAnalysis, CCTransaction, CCMerchantMemory, MerchantMemoryEntry, CollegeKid, CollegeFVAccount, CollegeForecastYear, CollegeExpenseLine, CollegeExpenseCategory, CollegeContributionLine, UiPrefs } from '../types'
 import { nextPeriodStart, prevPeriodStart, billIncludedInPeriod } from '../lib/periods'
 
 interface State {
@@ -115,6 +115,13 @@ interface State {
   updateCollegeContributionLine: (yearId: string, lineId: string, updates: Partial<CollegeContributionLine>) => void
   deleteCollegeContributionLine: (yearId: string, lineId: string) => void
   copyForecastLinesDown: (yearId: string, kind: 'expense' | 'contribution') => void
+
+  // UI preferences (persistent across sessions, synced via Supabase)
+  uiPrefs: UiPrefs
+  setUiPrefs: (updates: Partial<UiPrefs>) => void
+  setCollegeYearUi: (yearId: string, updates: Partial<UiPrefs['collegeYearUi'][string]>) => void
+  setWealthAccountExpanded: (accountId: string, expanded: boolean) => void
+  setPeriodExpanded: (periodId: string, expanded: boolean) => void
 }
 
 function uid() {
@@ -244,6 +251,48 @@ export const useStore = create<State>()(
       collegeKids: SEED_COLLEGE_KIDS,
       collegeFVAccounts: [],
       collegeForecastYears: [],
+
+      uiPrefs: {
+        currentModule: 'budget',
+        ccSelectedId: null,
+        ccRecurringOpen: true,
+        ccOneOffOpen: true,
+        ccAllTxOpen: false,
+        ccExpandedCats: [],
+        collegeYearUi: {},
+        wealthAccountExpanded: {},
+        wealthExpandLevel: 2,
+        periodExpanded: {},
+      },
+      setUiPrefs: (updates) =>
+        set(s => ({ uiPrefs: { ...s.uiPrefs, ...updates } })),
+      setCollegeYearUi: (yearId, updates) =>
+        set(s => {
+          const existing = s.uiPrefs.collegeYearUi[yearId] ?? { collapsed: false, contribsOpen: true, expensesOpen: true }
+          return {
+            uiPrefs: {
+              ...s.uiPrefs,
+              collegeYearUi: {
+                ...s.uiPrefs.collegeYearUi,
+                [yearId]: { ...existing, ...updates },
+              },
+            },
+          }
+        }),
+      setWealthAccountExpanded: (accountId, expanded) =>
+        set(s => ({
+          uiPrefs: {
+            ...s.uiPrefs,
+            wealthAccountExpanded: { ...s.uiPrefs.wealthAccountExpanded, [accountId]: expanded },
+          },
+        })),
+      setPeriodExpanded: (periodId, expanded) =>
+        set(s => ({
+          uiPrefs: {
+            ...s.uiPrefs,
+            periodExpanded: { ...s.uiPrefs.periodExpanded, [periodId]: expanded },
+          },
+        })),
 
       setPaySettings: (s) => {
         set(state => ({

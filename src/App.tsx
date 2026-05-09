@@ -14,10 +14,9 @@ import { HouseholdOnboarding } from './components/HouseholdOnboarding'
 import { useAuth } from './lib/auth'
 import { useHouseholdSync } from './lib/sync'
 import { formatDate, periodEndDate, buildProjectedOpenings } from './lib/periods'
+import type { AppModule } from './types'
 
-type Module = 'budget' | 'savings' | 'college' | 'bills' | 'cc'
-
-const MODULES: { id: Module; label: string; soon?: boolean }[] = [
+const MODULES: { id: AppModule; label: string; soon?: boolean }[] = [
   { id: 'budget',  label: 'Budget' },
   { id: 'savings', label: 'Savings & Retirement' },
   { id: 'cc',      label: 'Credit Card' },
@@ -67,7 +66,9 @@ function BudgetApp({ householdId, userId }: { householdId: string; userId: strin
   const ghostMode = useStore(s => s.ghostMode)
   const setGhostMode = useStore(s => s.setGhostMode)
   const quickLinksDocked = useStore(s => s.quickLinksDocked)
-  const [module, setModule] = useState<Module>('budget')
+  const module = useStore(s => s.uiPrefs.currentModule)
+  const setUiPrefs = useStore(s => s.setUiPrefs)
+  const setModule = (m: AppModule) => setUiPrefs({ currentModule: m })
   const [showStatement, setShowStatement] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
 

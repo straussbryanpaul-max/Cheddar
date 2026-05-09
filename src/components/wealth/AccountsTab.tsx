@@ -184,7 +184,11 @@ function AccountRow({ account, adjustments }: {
   const deleteAccountAdjustment = useStore(s => s.deleteAccountAdjustment)
   const collegeKids = useStore(s => s.collegeKids)
   const linkedKid = account.collegeKidId ? collegeKids.find(k => k.id === account.collegeKidId) : null
-  const [expanded, setExpanded] = useState(false)
+  const storedExpanded = useStore(s => s.uiPrefs.wealthAccountExpanded[account.id])
+  const setWealthAccountExpanded = useStore(s => s.setWealthAccountExpanded)
+  const expanded = storedExpanded ?? false
+  const setExpanded = (v: boolean | ((p: boolean) => boolean)) =>
+    setWealthAccountExpanded(account.id, typeof v === 'function' ? v(expanded) : v)
   const [editing, setEditing] = useState(false)
   const [addingAdj, setAddingAdj] = useState(false)
 
@@ -399,9 +403,12 @@ export function AccountsTab() {
   const addWealthAccount = useStore(s => s.addWealthAccount)
   const [adding, setAdding] = useState(false)
   const [summaryView, setSummaryView] = useState<SummaryView>('bank')
-  const [expandSig, setExpandSig] = useState<ExpandSig>({ level: 2, v: 0 })
+  const persistedLevel = useStore(s => s.uiPrefs.wealthExpandLevel)
+  const setUiPrefs = useStore(s => s.setUiPrefs)
+  const [expandSig, setExpandSig] = useState<ExpandSig>({ level: persistedLevel, v: 0 })
 
   function expandTo(level: number) {
+    setUiPrefs({ wealthExpandLevel: level })
     setExpandSig(s => ({ level, v: s.v + 1 }))
   }
 

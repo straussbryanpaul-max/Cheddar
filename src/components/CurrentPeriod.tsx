@@ -29,7 +29,13 @@ export function CurrentPeriod({ periodId, projectedOpening, label = 'Current Per
   const resetPeriod = useStore(s => s.resetPeriod)
   const actuals = allActuals.find(a => a.periodId === periodId) ?? null
 
-  const [collapsed, setCollapsed] = useState(collapsible)
+  const periodExpanded = useStore(s => s.uiPrefs.periodExpanded[periodId])
+  const setPeriodExpanded = useStore(s => s.setPeriodExpanded)
+  const collapsed = periodExpanded === undefined ? collapsible : !periodExpanded
+  const setCollapsed = (next: boolean | ((c: boolean) => boolean)) => {
+    const value = typeof next === 'function' ? next(collapsed) : next
+    setPeriodExpanded(periodId, !value)
+  }
   const [editingBalance, setEditingBalance] = useState(false)
   const [balanceDraft, setBalanceDraft] = useState('')
   const [editingPay, setEditingPay] = useState(false)

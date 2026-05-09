@@ -51,7 +51,26 @@ export function CCModule() {
   const deleteCCAnalysis = useStore(s => s.deleteCCAnalysis)
 
   const sortedAnalyses = [...ccAnalyses].sort((a, b) => b.savedAt.localeCompare(a.savedAt) || b.id.localeCompare(a.id))
-  const [selectedId, setSelectedId] = useState<string | null>(sortedAnalyses[0]?.id ?? null)
+  const storedSelectedId = useStore(s => s.uiPrefs.ccSelectedId)
+  const recurringOpen = useStore(s => s.uiPrefs.ccRecurringOpen)
+  const oneOffOpen = useStore(s => s.uiPrefs.ccOneOffOpen)
+  const allTxOpen = useStore(s => s.uiPrefs.ccAllTxOpen)
+  const expandedCatsList = useStore(s => s.uiPrefs.ccExpandedCats)
+  const setUiPrefs = useStore(s => s.setUiPrefs)
+  const expandedCats = new Set(expandedCatsList)
+  const setExpandedCats = (next: Set<string> | ((prev: Set<string>) => Set<string>)) => {
+    const value = typeof next === 'function' ? next(expandedCats) : next
+    setUiPrefs({ ccExpandedCats: [...value] })
+  }
+  // Fall back to most-recent analysis if the saved selection no longer exists.
+  const selectedId = storedSelectedId && ccAnalyses.some(a => a.id === storedSelectedId)
+    ? storedSelectedId
+    : (sortedAnalyses[0]?.id ?? null)
+  const setSelectedId = (id: string | null) => setUiPrefs({ ccSelectedId: id })
+  const setRecurringOpen = (v: boolean | ((p: boolean) => boolean)) => setUiPrefs({ ccRecurringOpen: typeof v === 'function' ? v(recurringOpen) : v })
+  const setOneOffOpen = (v: boolean | ((p: boolean) => boolean)) => setUiPrefs({ ccOneOffOpen: typeof v === 'function' ? v(oneOffOpen) : v })
+  const setAllTxOpen = (v: boolean | ((p: boolean) => boolean)) => setUiPrefs({ ccAllTxOpen: typeof v === 'function' ? v(allTxOpen) : v })
+
   const [step, setStep] = useState<Step>(ccAnalyses.length === 0 ? 'upload' : 'results')
   const [apiKeyDraft, setApiKeyDraft] = useState(anthropicApiKey)
   const [editingKey, setEditingKey] = useState(!anthropicApiKey)
@@ -66,10 +85,6 @@ export function CCModule() {
   const [view, setView] = useState<'results' | 'flagged'>('results')
   const [editingNoteTxId, setEditingNoteTxId] = useState<string | null>(null)
   const [noteDraft, setNoteDraft] = useState('')
-  const [recurringOpen, setRecurringOpen] = useState(true)
-  const [oneOffOpen, setOneOffOpen] = useState(true)
-  const [allTxOpen, setAllTxOpen] = useState(false)
-  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set())
 
   const ccFileRef = useRef<HTMLInputElement>(null)
   const amazonFileRef = useRef<HTMLInputElement>(null)

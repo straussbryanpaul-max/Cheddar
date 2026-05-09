@@ -438,9 +438,17 @@ function YearCard({
   const canCopyDown = year.yearIndex < 3
 
   const closed = year.closedOut
-  const [collapsed, setCollapsed] = useState(closed)
-  const [contribsOpen, setContribsOpen] = useState(true)
-  const [expensesOpen, setExpensesOpen] = useState(true)
+  const yearUi = useStore(s => s.uiPrefs.collegeYearUi[year.id])
+  const setCollegeYearUi = useStore(s => s.setCollegeYearUi)
+  const collapsed = yearUi?.collapsed ?? closed
+  const contribsOpen = yearUi?.contribsOpen ?? true
+  const expensesOpen = yearUi?.expensesOpen ?? true
+  const setCollapsed = (v: boolean | ((p: boolean) => boolean)) =>
+    setCollegeYearUi(year.id, { collapsed: typeof v === 'function' ? v(collapsed) : v })
+  const setContribsOpen = (v: boolean | ((p: boolean) => boolean)) =>
+    setCollegeYearUi(year.id, { contribsOpen: typeof v === 'function' ? v(contribsOpen) : v })
+  const setExpensesOpen = (v: boolean | ((p: boolean) => boolean)) =>
+    setCollegeYearUi(year.id, { expensesOpen: typeof v === 'function' ? v(expensesOpen) : v })
 
   const { growth, end: forecastEnd, totalExpenses, totalContributions } = computeYearForecast(
     beginBalance, rate, year.contributionLines, year.expenseLines

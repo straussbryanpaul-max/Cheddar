@@ -23,7 +23,13 @@ export function UpcomingPeriod({ periodId, projectedOpening }: Props) {
   const payFrequency = useStore(s => s.payFrequency)
   const defaultPayAmount = useStore(s => s.defaultPayAmount)
   const resetPeriod = useStore(s => s.resetPeriod)
-  const [expanded, setExpanded] = useState(false)
+  const periodExpanded = useStore(s => s.uiPrefs.periodExpanded[periodId])
+  const setPeriodExpanded = useStore(s => s.setPeriodExpanded)
+  const expanded = periodExpanded ?? false
+  const setExpanded = (next: boolean | ((e: boolean) => boolean)) => {
+    const value = typeof next === 'function' ? next(expanded) : next
+    setPeriodExpanded(periodId, value)
+  }
   const [editingPay, setEditingPay] = useState(false)
   const [payDraft, setPayDraft] = useState('')
   const [confirmResetPeriod, setConfirmResetPeriod] = useState(false)
