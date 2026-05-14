@@ -121,6 +121,9 @@ interface State {
   setUiPrefs: (updates: Partial<UiPrefs>) => void
   setCollegeYearUi: (yearId: string, updates: Partial<UiPrefs['collegeYearUi'][string]>) => void
   setWealthAccountExpanded: (accountId: string, expanded: boolean) => void
+  setWealthInstitutionExpanded: (institution: string, expanded: boolean) => void
+  setWealthCategoryExpanded: (key: string, expanded: boolean) => void
+  setWealthAllExpanded: (level: number, institutions: string[], categoryKeys: string[]) => void
   setPeriodExpanded: (periodId: string, expanded: boolean) => void
 }
 
@@ -227,7 +230,14 @@ export const useStore = create<State>()(
   (set, get) => ({
       hydrated: false,
       setHydrated: (v) => set({ hydrated: v }),
-      hydrate: (data) => set(data as State),
+      hydrate: (data) =>
+        set(s => {
+          const next = { ...data } as Partial<State>
+          if (next.uiPrefs) {
+            next.uiPrefs = { ...s.uiPrefs, ...next.uiPrefs }
+          }
+          return next as State
+        }),
       bills: SEED_BILLS,
       periods: buildSeedPeriods(DEFAULT_PAY_AMOUNT, DEFAULT_PAY_ANCHOR, DEFAULT_PAY_FREQ),
       periodItems: [],
@@ -260,7 +270,10 @@ export const useStore = create<State>()(
         ccAllTxOpen: false,
         ccExpandedCats: [],
         collegeYearUi: {},
+        wealthTab: 'accounts',
         wealthAccountExpanded: {},
+        wealthInstitutionExpanded: {},
+        wealthCategoryExpanded: {},
         wealthExpandLevel: 2,
         periodExpanded: {},
       },
@@ -286,6 +299,35 @@ export const useStore = create<State>()(
             wealthAccountExpanded: { ...s.uiPrefs.wealthAccountExpanded, [accountId]: expanded },
           },
         })),
+      setWealthInstitutionExpanded: (institution, expanded) =>
+        set(s => ({
+          uiPrefs: {
+            ...s.uiPrefs,
+            wealthInstitutionExpanded: { ...s.uiPrefs.wealthInstitutionExpanded, [institution]: expanded },
+          },
+        })),
+      setWealthCategoryExpanded: (key, expanded) =>
+        set(s => ({
+          uiPrefs: {
+            ...s.uiPrefs,
+            wealthCategoryExpanded: { ...s.uiPrefs.wealthCategoryExpanded, [key]: expanded },
+          },
+        })),
+      setWealthAllExpanded: (level, institutions, categoryKeys) =>
+        set(s => {
+          const inst: Record<string, boolean> = {}
+          const cat: Record<string, boolean> = {}
+          for (const i of institutions) inst[i] = level >= 1
+          for (const k of categoryKeys) cat[k] = level >= 2
+          return {
+            uiPrefs: {
+              ...s.uiPrefs,
+              wealthExpandLevel: level,
+              wealthInstitutionExpanded: inst,
+              wealthCategoryExpanded: cat,
+            },
+          }
+        }),
       setPeriodExpanded: (periodId, expanded) =>
         set(s => ({
           uiPrefs: {

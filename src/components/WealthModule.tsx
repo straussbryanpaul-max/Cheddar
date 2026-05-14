@@ -1,9 +1,8 @@
-import { useState } from 'react'
 import { AccountsTab } from './wealth/AccountsTab'
 import { ProjectionsTab } from './wealth/ProjectionsTab'
 import { RetirementTab } from './wealth/RetirementTab'
-
-type WealthTab = 'accounts' | 'projections' | 'retirement'
+import { useStore } from '../store'
+import type { WealthTab } from '../types'
 
 const TABS: { id: WealthTab; label: string }[] = [
   { id: 'accounts',    label: 'Accounts' },
@@ -12,7 +11,9 @@ const TABS: { id: WealthTab; label: string }[] = [
 ]
 
 export function WealthModule() {
-  const [tab, setTab] = useState<WealthTab>('accounts')
+  const tab = useStore(s => s.uiPrefs.wealthTab)
+  const setUiPrefs = useStore(s => s.setUiPrefs)
+  const setTab = (t: WealthTab) => setUiPrefs({ wealthTab: t })
 
   return (
     <div className="space-y-4">

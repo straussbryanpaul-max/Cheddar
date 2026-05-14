@@ -239,6 +239,8 @@ export interface CollegeForecastYear {
 
 export type AppModule = 'budget' | 'savings' | 'college' | 'bills' | 'cc'
 
+export type WealthTab = 'accounts' | 'projections' | 'retirement'
+
 export interface UiPrefs {
   currentModule: AppModule
   ccSelectedId: string | null
@@ -247,7 +249,10 @@ export interface UiPrefs {
   ccAllTxOpen: boolean
   ccExpandedCats: string[]
   collegeYearUi: Record<string, { collapsed: boolean; contribsOpen: boolean; expensesOpen: boolean }>
+  wealthTab: WealthTab
   wealthAccountExpanded: Record<string, boolean>
+  wealthInstitutionExpanded: Record<string, boolean>
+  wealthCategoryExpanded: Record<string, boolean>
   wealthExpandLevel: number
   periodExpanded: Record<string, boolean>
 }

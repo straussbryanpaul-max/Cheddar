@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useStore } from '../../store'
 import { useFormatCurrency } from '../../lib/useFormatCurrency'
 import { ACCOUNT_TYPE_LABELS, ACCOUNT_CATEGORY_LABELS, CATEGORY_ORDER } from '../../lib/wealth'
@@ -11,8 +11,22 @@ const today = () => new Date().toISOString().split('T')[0]
 
 type SummaryView = 'bank' | 'category' | 'account'
 
-// level 0 = institutions collapsed, 1 = categories visible, 2 = accounts visible
-type ExpandSig = { level: number; v: number }
+function forecastNetFor(accountId: string, adjustments: AccountAdjustment[]): number {
+  let sum = 0
+  for (const a of adjustments) {
+    if (a.type === 'forecast' && a.accountId === accountId) sum += a.amount
+  }
+  return sum
+}
+
+function forecastNetForAccounts(accounts: WealthAccount[], adjustments: AccountAdjustment[]): number {
+  const ids = new Set(accounts.map(a => a.id))
+  let sum = 0
+  for (const a of adjustments) {
+    if (a.type === 'forecast' && ids.has(a.accountId)) sum += a.amount
+  }
+  return sum
+}
 
 interface FormState {
   institution: string
@@ -297,25 +311,28 @@ function AccountRow({ account, adjustments }: {
   )
 }
 
-function CategorySubSection({ category, accounts, allAdjustments, expandSig }: {
+function CategorySubSection({ institution, category, accounts, allAdjustments }: {
+  institution: string
   category: AccountCategory
   accounts: WealthAccount[]
   allAdjustments: AccountAdjustment[]
-  expandSig: ExpandSig
 }) {
   const fmt = useFormatCurrency()
-  const [expanded, setExpanded] = useState(true)
-  const catTotal = accounts.reduce((s, a) => s + a.balance, 0)
+  const key = `${institution}|${category}`
+  const stored = useStore(s => s.uiPrefs.wealthCategoryExpanded[key])
+  const setWealthCategoryExpanded = useStore(s => s.setWealthCategoryExpanded)
+  const expanded = stored ?? true
+  const setExpanded = (v: boolean) => setWealthCategoryExpanded(key, v)
 
-  useEffect(() => {
-    setExpanded(expandSig.level >= 2)
-  }, [expandSig.v])
+  const catTotal = accounts.reduce((s, a) => s + a.balance, 0)
+  const catForecast = forecastNetForAccounts(accounts, allAdjustments)
+  const catProjected = catTotal + catForecast
 
   return (
     <div>
       <button
         type="button"
-        onClick={() => setExpanded(e => !e)}
+        onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between px-3 py-1 hover:bg-slate-700/20 rounded transition-colors"
       >
         <div className="flex items-center gap-1.5">
@@ -324,7 +341,12 @@ function CategorySubSection({ category, accounts, allAdjustments, expandSig }: {
           </svg>
           <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">{ACCOUNT_CATEGORY_LABELS[category]}</span>
         </div>
-        <span className="text-xs text-slate-500 tabular-nums">{fmt(catTotal)}</span>
+        <div className="text-right">
+          <div className="text-xs text-slate-500 tabular-nums">{fmt(catTotal)}</div>
+          {catForecast !== 0 && (
+            <div className="text-[10px] text-blue-400 tabular-nums">→ {fmt(catProjected)}</div>
+          )}
+        </div>
       </button>
       {expanded && (
         <div className="ml-3 space-y-0.5">
@@ -341,26 +363,27 @@ function CategorySubSection({ category, accounts, allAdjustments, expandSig }: {
   )
 }
 
-function InstitutionSection({ institution, accounts, allAdjustments, expandSig }: {
+function InstitutionSection({ institution, accounts, allAdjustments }: {
   institution: string
   accounts: WealthAccount[]
   allAdjustments: AccountAdjustment[]
-  expandSig: ExpandSig
 }) {
   const fmt = useFormatCurrency()
-  const [expanded, setExpanded] = useState(true)
-  const instTotal = accounts.reduce((s, a) => s + a.balance, 0)
-  const categories = CATEGORY_ORDER.filter(cat => accounts.some(a => a.category === cat))
+  const stored = useStore(s => s.uiPrefs.wealthInstitutionExpanded[institution])
+  const setWealthInstitutionExpanded = useStore(s => s.setWealthInstitutionExpanded)
+  const expanded = stored ?? true
+  const setExpanded = (v: boolean) => setWealthInstitutionExpanded(institution, v)
 
-  useEffect(() => {
-    setExpanded(expandSig.level >= 1)
-  }, [expandSig.v])
+  const instTotal = accounts.reduce((s, a) => s + a.balance, 0)
+  const instForecast = forecastNetForAccounts(accounts, allAdjustments)
+  const instProjected = instTotal + instForecast
+  const categories = CATEGORY_ORDER.filter(cat => accounts.some(a => a.category === cat))
 
   return (
     <div className="border border-slate-700/50 rounded-lg overflow-hidden">
       <button
         type="button"
-        onClick={() => setExpanded(e => !e)}
+        onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between px-3 py-2 bg-slate-700/30 hover:bg-slate-700/50 transition-colors"
       >
         <div className="flex items-center gap-2">
@@ -370,7 +393,12 @@ function InstitutionSection({ institution, accounts, allAdjustments, expandSig }
           <span className="text-sm font-semibold text-slate-200">{institution}</span>
           <span className="text-xs text-slate-600">{accounts.length} acct{accounts.length !== 1 ? 's' : ''}</span>
         </div>
-        <span className="text-sm font-semibold text-emerald-300 tabular-nums">{fmt(instTotal)}</span>
+        <div className="text-right">
+          <div className="text-sm font-semibold text-emerald-300 tabular-nums">{fmt(instTotal)}</div>
+          {instForecast !== 0 && (
+            <div className="text-xs text-blue-400 tabular-nums">→ {fmt(instProjected)}</div>
+          )}
+        </div>
       </button>
 
       {expanded && (
@@ -378,10 +406,10 @@ function InstitutionSection({ institution, accounts, allAdjustments, expandSig }
           {categories.map(cat => (
             <CategorySubSection
               key={cat}
+              institution={institution}
               category={cat}
               accounts={accounts.filter(a => a.category === cat)}
               allAdjustments={allAdjustments}
-              expandSig={expandSig}
             />
           ))}
         </div>
@@ -403,13 +431,17 @@ export function AccountsTab() {
   const addWealthAccount = useStore(s => s.addWealthAccount)
   const [adding, setAdding] = useState(false)
   const [summaryView, setSummaryView] = useState<SummaryView>('bank')
-  const persistedLevel = useStore(s => s.uiPrefs.wealthExpandLevel)
-  const setUiPrefs = useStore(s => s.setUiPrefs)
-  const [expandSig, setExpandSig] = useState<ExpandSig>({ level: persistedLevel, v: 0 })
+  const expandLevel = useStore(s => s.uiPrefs.wealthExpandLevel)
+  const setWealthAllExpanded = useStore(s => s.setWealthAllExpanded)
 
   function expandTo(level: number) {
-    setUiPrefs({ wealthExpandLevel: level })
-    setExpandSig(s => ({ level, v: s.v + 1 }))
+    const institutionNames = [...new Set(accounts.map(a => a.institution || 'Unknown'))]
+    const categoryKeys: string[] = []
+    for (const inst of institutionNames) {
+      const cats = new Set(accounts.filter(a => (a.institution || 'Unknown') === inst).map(a => a.category))
+      for (const cat of cats) categoryKeys.push(`${inst}|${cat}`)
+    }
+    setWealthAllExpanded(level, institutionNames, categoryKeys)
   }
 
   function handleAdd(form: FormState) {
@@ -429,28 +461,52 @@ export function AccountsTab() {
   }
 
   const grandTotal = accounts.reduce((s, a) => s + a.balance, 0)
+  const grandForecast = allAdjustments
+    .filter(adj => adj.type === 'forecast')
+    .reduce((s, a) => s + a.amount, 0)
+  const grandProjected = grandTotal + grandForecast
   const institutions = [...new Set(accounts.map(a => a.institution || 'Unknown'))].sort()
 
-  const summaryItems: { label: string; total: number }[] =
+  const summaryItems: { label: string; total: number; forecast: number }[] =
     summaryView === 'bank'
-      ? institutions.map(inst => ({
-          label: inst,
-          total: accounts.filter(a => (a.institution || 'Unknown') === inst).reduce((s, a) => s + a.balance, 0),
-        }))
+      ? institutions.map(inst => {
+          const groupAccounts = accounts.filter(a => (a.institution || 'Unknown') === inst)
+          return {
+            label: inst,
+            total: groupAccounts.reduce((s, a) => s + a.balance, 0),
+            forecast: forecastNetForAccounts(groupAccounts, allAdjustments),
+          }
+        })
       : summaryView === 'category'
       ? CATEGORY_ORDER
-          .map(cat => ({ label: ACCOUNT_CATEGORY_LABELS[cat], total: accounts.filter(a => a.category === cat).reduce((s, a) => s + a.balance, 0) }))
+          .map(cat => {
+            const groupAccounts = accounts.filter(a => a.category === cat)
+            return {
+              label: ACCOUNT_CATEGORY_LABELS[cat],
+              total: groupAccounts.reduce((s, a) => s + a.balance, 0),
+              forecast: forecastNetForAccounts(groupAccounts, allAdjustments),
+            }
+          })
           .filter(c => c.total > 0)
       : [...accounts]
           .sort((a, b) => b.balance - a.balance)
-          .map(a => ({ label: a.name || a.institution || 'Unknown', total: a.balance }))
+          .map(a => ({
+            label: a.name || a.institution || 'Unknown',
+            total: a.balance,
+            forecast: forecastNetFor(a.id, allAdjustments),
+          }))
 
   return (
     <div className="bg-slate-800 rounded-2xl overflow-hidden shadow-2xl">
       <div className="bg-slate-700/50 px-5 py-3 flex items-center justify-between">
         <div>
           <h2 className="text-white font-semibold text-lg">Accounts</h2>
-          <p className="text-slate-400 text-xs mt-0.5">Total: {fmt(grandTotal)}</p>
+          <p className="text-slate-400 text-xs mt-0.5">
+            Total: {fmt(grandTotal)}
+            {grandForecast !== 0 && (
+              <span className="text-blue-400 ml-2">→ {fmt(grandProjected)}</span>
+            )}
+          </p>
         </div>
         {/* Expand level buttons */}
         <div className="flex items-center gap-1 bg-slate-800/60 rounded-lg p-0.5">
@@ -460,7 +516,7 @@ export function AccountsTab() {
               type="button"
               onClick={() => expandTo(level)}
               className={`text-xs px-2.5 py-1 rounded-md font-medium transition-colors ${
-                expandSig.level === level ? 'bg-slate-600 text-white' : 'text-slate-500 hover:text-slate-300'
+                expandLevel === level ? 'bg-slate-600 text-white' : 'text-slate-500 hover:text-slate-300'
               }`}
             >
               {label}
@@ -486,10 +542,13 @@ export function AccountsTab() {
           ))}
         </div>
         <div className="flex gap-1.5 flex-wrap">
-          {summaryItems.map(({ label, total }) => (
+          {summaryItems.map(({ label, total, forecast }) => (
             <div key={label} className="bg-slate-700/50 rounded px-2.5 py-1 text-center">
               <div className="text-xs text-slate-400 truncate max-w-[110px]">{label}</div>
               <div className="text-xs font-semibold text-emerald-300 tabular-nums">{fmt(total)}</div>
+              {forecast !== 0 && (
+                <div className="text-[10px] text-blue-400 tabular-nums">→ {fmt(total + forecast)}</div>
+              )}
             </div>
           ))}
         </div>
@@ -503,7 +562,6 @@ export function AccountsTab() {
             institution={inst}
             accounts={accounts.filter(a => (a.institution || 'Unknown') === inst)}
             allAdjustments={allAdjustments}
-            expandSig={expandSig}
           />
         ))}
       </div>
