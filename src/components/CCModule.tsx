@@ -86,6 +86,7 @@ export function CCModule() {
   const [error, setError] = useState('')
   const [matchRunning, setMatchRunning] = useState(false)
   const [matchError, setMatchError] = useState('')
+  const [matchStatus, setMatchStatus] = useState<{ candidates: number; matched: number; analysisId: string } | null>(null)
   const [editingCatTxId, setEditingCatTxId] = useState<string | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [personFilter, setPersonFilter] = useState<'All' | 'Bryan' | 'Rachel'>('All')
@@ -138,15 +139,18 @@ export function CCModule() {
       // Auto-run S&S match on the freshly imported statement.
       if (amazonSSItems.length > 0) {
         const candidates = result.transactions
-          .filter(tx => tx.category === 'Amazon' && tx.person === 'Rachel')
+          .filter(tx => tx.category === 'Amazon' && (tx.person === 'Rachel' || tx.person == null))
           .map(tx => ({ id: tx.id, date: tx.date, amount: tx.amount }))
         if (candidates.length > 0) {
           try {
             const matched = await matchAmazonSubscribeSave(amazonSSItems, candidates, result.statementRange, key)
             applyAmazonSSMatch(result.id, matched)
+            setMatchStatus({ candidates: candidates.length, matched: matched.length, analysisId: result.id })
           } catch (e) {
             console.error('Auto S&S match failed', e)
           }
+        } else {
+          setMatchStatus({ candidates: 0, matched: 0, analysisId: result.id })
         }
       }
 
@@ -166,11 +170,14 @@ export function CCModule() {
     setMatchError('')
     setMatchRunning(true)
     try {
+      // Include Amazon charges on Rachel's card OR with no person assigned
+      // (user has confirmed all S&S deliveries are on Rachel's card).
       const candidates = target.transactions
-        .filter(tx => tx.category === 'Amazon' && tx.person === 'Rachel')
+        .filter(tx => tx.category === 'Amazon' && (tx.person === 'Rachel' || tx.person == null))
         .map(tx => ({ id: tx.id, date: tx.date, amount: tx.amount }))
       const matched = await matchAmazonSubscribeSave(amazonSSItems, candidates, target.statementRange, key)
       applyAmazonSSMatch(target.id, matched)
+      setMatchStatus({ candidates: candidates.length, matched: matched.length, analysisId: target.id })
     } catch (e) {
       setMatchError(e instanceof Error ? e.message : 'Match failed')
     } finally {
@@ -351,7 +358,10 @@ export function CCModule() {
         onRunMatch={() => runMatch(analysis)}
         matchRunning={matchRunning}
         matchError={matchError}
+        matchStatus={matchStatus && matchStatus.analysisId === analysis.id ? matchStatus : null}
         targetMonth={analysis.month}
+        apiKey={anthropicApiKey}
+        onSaveApiKey={setAnthropicApiKey}
       />
 
       {/* Month tabs — always visible so you can see what's stored */}
@@ -817,7 +827,10 @@ interface SSListProps {
   onRunMatch: () => void
   matchRunning: boolean
   matchError: string
+  matchStatus: { candidates: number; matched: number; analysisId: string } | null
   targetMonth: string
+  apiKey: string
+  onSaveApiKey: (key: string) => void
 }
 
 function freqLabel(f: number): string {
@@ -830,13 +843,16 @@ function freqLabel(f: number): string {
 
 function SubscribeSaveList({
   items, open, onToggleOpen, onAdd, onUpdate, onDelete,
-  onRunMatch, matchRunning, matchError, targetMonth,
+  onRunMatch, matchRunning, matchError, matchStatus, targetMonth,
+  apiKey, onSaveApiKey,
 }: SSListProps) {
   const fmt = useFormatCurrency()
   const [draftName, setDraftName] = useState('')
   const [draftAmount, setDraftAmount] = useState('')
   const [draftFreq, setDraftFreq] = useState('1')
   const [draftLast, setDraftLast] = useState(new Date().toISOString().split('T')[0])
+  const [keyDraft, setKeyDraft] = useState('')
+  const [showKeyEntry, setShowKeyEntry] = useState(false)
 
   function commitAdd() {
     const name = draftName.trim()
@@ -886,7 +902,51 @@ function SubscribeSaveList({
       {open && (
         <div className="border-t border-slate-700/50">
           {matchError && (
-            <div className="px-4 py-2 text-xs text-red-400 bg-red-900/20 border-b border-red-800/30">{matchError}</div>
+            <div className="px-4 py-2 text-xs text-red-400 bg-red-900/20 border-b border-red-800/30 flex items-center justify-between gap-2">
+              <span>{matchError}</span>
+              {matchError.toLowerCase().includes('api key') && (
+                <button
+                  onClick={() => setShowKeyEntry(true)}
+                  className="text-xs px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-medium"
+                >Set Key</button>
+              )}
+            </div>
+          )}
+
+          {/* API key entry — shown when missing or user opens it */}
+          {(showKeyEntry || !apiKey) && (
+            <div className="px-4 py-2.5 bg-slate-900/40 border-b border-slate-700/30 flex items-center gap-2">
+              <span className="text-xs text-slate-500 uppercase tracking-widest">Anthropic Key</span>
+              <input
+                type="password"
+                className="flex-1 bg-slate-700 text-white text-xs rounded px-2 py-1 border border-slate-600 focus:border-blue-500 outline-none font-mono"
+                placeholder="sk-ant-..."
+                value={keyDraft}
+                onChange={e => setKeyDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && keyDraft) { onSaveApiKey(keyDraft); setShowKeyEntry(false); setKeyDraft('') } }}
+              />
+              <button
+                onClick={() => { if (keyDraft) { onSaveApiKey(keyDraft); setShowKeyEntry(false); setKeyDraft('') } }}
+                className="text-xs px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-medium"
+                disabled={!keyDraft}
+              >Save</button>
+              {apiKey && (
+                <button onClick={() => { setShowKeyEntry(false); setKeyDraft('') }} className="text-xs text-slate-500 hover:text-slate-300">Cancel</button>
+              )}
+            </div>
+          )}
+
+          {/* Match status — shows what the last run did */}
+          {matchStatus && (
+            <div className="px-4 py-2 text-xs bg-slate-900/30 border-b border-slate-700/30 flex items-center gap-2">
+              {matchStatus.candidates === 0 ? (
+                <span className="text-amber-400">No Amazon charges found on Rachel's card in {targetMonth} — nothing to match against.</span>
+              ) : (
+                <span className="text-slate-400">
+                  Matched <span className="text-emerald-400 font-medium">{matchStatus.matched}</span> of <span className="text-slate-300 font-medium">{matchStatus.candidates}</span> Amazon {matchStatus.candidates === 1 ? 'charge' : 'charges'} in {targetMonth}.
+                </span>
+              )}
+            </div>
           )}
 
           {/* Totals row — per-frequency subtotals + monthly-equivalent grand total */}

@@ -146,7 +146,7 @@ const SS_MATCH_PROMPT = `You match Amazon Subscribe & Save deliveries against cr
 You are given:
 1. A persistent list of Subscribe & Save items, each with an expected per-shipment cost, a delivery frequency in months (can be fractional — e.g. 0.5 means twice a month / roughly every 2 weeks), and a known past delivery date. From the past date and frequency you can extrapolate all expected delivery dates (e.g. lastDelivered=2025-07-12, frequencyMonths=2 → expect deliveries in Sep, Nov, Jan, Mar, May ... in both directions; frequencyMonths=0.5 → expect deliveries roughly every 14-15 days).
 2. A statement period (date range).
-3. A list of Amazon charges on Rachel's card that fell inside that period.
+3. A list of Amazon charges on Rachel's card that fell inside that period. (Some charges may have had no cardholder detected; treat those as likely on Rachel's card too, since all Subscribe & Save deliveries are billed to her.)
 
 Decide which charges are Subscribe & Save deliveries vs one-off Amazon purchases:
 - A charge is a Subscribe & Save match if its amount is close to a list item's amount (within ~$1 or ~10%, accounting for small tax/price drift) AND an extrapolated delivery from that item is expected within the statement period (±10 days slack).
