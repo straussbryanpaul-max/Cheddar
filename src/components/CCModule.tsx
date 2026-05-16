@@ -820,10 +820,19 @@ interface SSListProps {
   targetMonth: string
 }
 
+function freqLabel(f: number): string {
+  if (f === 0.5) return 'Twice monthly'
+  if (f === 1) return 'Monthly'
+  if (f === 12) return 'Annually'
+  if (Number.isInteger(f)) return `Every ${f} mo`
+  return `Every ${f} mo`
+}
+
 function SubscribeSaveList({
   items, open, onToggleOpen, onAdd, onUpdate, onDelete,
   onRunMatch, matchRunning, matchError, targetMonth,
 }: SSListProps) {
+  const fmt = useFormatCurrency()
   const [draftName, setDraftName] = useState('')
   const [draftAmount, setDraftAmount] = useState('')
   const [draftFreq, setDraftFreq] = useState('1')
@@ -837,6 +846,19 @@ function SubscribeSaveList({
     onAdd({ name, amount, frequencyMonths: freq, lastDelivered: draftLast })
     setDraftName(''); setDraftAmount(''); setDraftFreq('1'); setDraftLast(new Date().toISOString().split('T')[0])
   }
+
+  // Group items by frequency and compute per-cycle subtotals + monthly equivalent.
+  const freqGroups = (() => {
+    const map = new Map<number, { items: AmazonSubscribeItem[]; perCycleSum: number }>()
+    for (const item of items) {
+      const e = map.get(item.frequencyMonths)
+      if (e) { e.items.push(item); e.perCycleSum += item.amount }
+      else map.set(item.frequencyMonths, { items: [item], perCycleSum: item.amount })
+    }
+    return [...map.entries()].sort(([a], [b]) => a - b)
+  })()
+  const monthlyEquivTotal = items.reduce((s, i) =>
+    s + (i.frequencyMonths > 0 ? i.amount / i.frequencyMonths : 0), 0)
 
   return (
     <div className="bg-slate-800 rounded-xl overflow-hidden">
@@ -865,6 +887,25 @@ function SubscribeSaveList({
         <div className="border-t border-slate-700/50">
           {matchError && (
             <div className="px-4 py-2 text-xs text-red-400 bg-red-900/20 border-b border-red-800/30">{matchError}</div>
+          )}
+
+          {/* Totals row — per-frequency subtotals + monthly-equivalent grand total */}
+          {items.length > 0 && (
+            <div className="px-4 py-3 border-b border-slate-700/30 flex items-center gap-2 flex-wrap text-xs">
+              {freqGroups.map(([freq, group]) => (
+                <span key={freq} className="bg-slate-700/40 rounded-lg px-2.5 py-1 text-slate-300 flex items-center gap-1.5">
+                  <span className="text-slate-400">{freqLabel(freq)}</span>
+                  <span className="text-slate-600">·</span>
+                  <span className="text-slate-600">{group.items.length}</span>
+                  <span className="text-slate-600">·</span>
+                  <span className="tabular-nums font-medium text-slate-200">{fmt(group.perCycleSum)}</span>
+                </span>
+              ))}
+              <span className="ml-auto text-slate-400 flex items-center gap-1.5">
+                <span className="uppercase tracking-widest text-[10px] text-slate-500">Monthly Equivalent</span>
+                <span className="tabular-nums font-semibold text-emerald-400 text-sm">{fmt(monthlyEquivTotal)}</span>
+              </span>
+            </div>
           )}
 
           {/* Header row */}
