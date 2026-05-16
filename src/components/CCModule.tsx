@@ -832,7 +832,7 @@ function SubscribeSaveList({
   function commitAdd() {
     const name = draftName.trim()
     const amount = parseFloat(draftAmount)
-    const freq = parseInt(draftFreq, 10)
+    const freq = parseFloat(draftFreq)
     if (!name || !Number.isFinite(amount) || amount <= 0 || !Number.isFinite(freq) || freq <= 0 || !draftLast) return
     onAdd({ name, amount, frequencyMonths: freq, lastDelivered: draftLast })
     setDraftName(''); setDraftAmount(''); setDraftFreq('1'); setDraftLast(new Date().toISOString().split('T')[0])
@@ -897,11 +897,11 @@ function SubscribeSaveList({
               />
               <input
                 type="number"
-                step="1"
-                min="1"
+                step="0.5"
+                min="0.25"
                 className="bg-slate-700/50 text-sm text-slate-200 rounded px-2 py-1 border border-slate-600/50 focus:border-blue-500 outline-none text-right tabular-nums"
                 value={item.frequencyMonths}
-                onChange={e => onUpdate(item.id, { frequencyMonths: parseInt(e.target.value, 10) || 1 })}
+                onChange={e => onUpdate(item.id, { frequencyMonths: parseFloat(e.target.value) || 1 })}
               />
               <input
                 type="date"
@@ -942,8 +942,8 @@ function SubscribeSaveList({
             />
             <input
               type="number"
-              step="1"
-              min="1"
+              step="0.5"
+              min="0.25"
               className="bg-slate-700/50 text-sm text-slate-200 rounded px-2 py-1 border border-slate-600/50 focus:border-blue-500 outline-none text-right tabular-nums"
               value={draftFreq}
               onChange={e => setDraftFreq(e.target.value)}

@@ -144,7 +144,7 @@ interface SSMatchCandidate {
 const SS_MATCH_PROMPT = `You match Amazon Subscribe & Save deliveries against credit card charges.
 
 You are given:
-1. A persistent list of Subscribe & Save items, each with an expected per-shipment cost, a delivery frequency in months, and a known past delivery date. From the past date and frequency you can extrapolate all expected delivery dates (e.g. lastDelivered=2025-07-12, frequencyMonths=2 → expect deliveries in Sep, Nov, Jan, Mar, May ... in both directions).
+1. A persistent list of Subscribe & Save items, each with an expected per-shipment cost, a delivery frequency in months (can be fractional — e.g. 0.5 means twice a month / roughly every 2 weeks), and a known past delivery date. From the past date and frequency you can extrapolate all expected delivery dates (e.g. lastDelivered=2025-07-12, frequencyMonths=2 → expect deliveries in Sep, Nov, Jan, Mar, May ... in both directions; frequencyMonths=0.5 → expect deliveries roughly every 14-15 days).
 2. A statement period (date range).
 3. A list of Amazon charges on Rachel's card that fell inside that period.
 
