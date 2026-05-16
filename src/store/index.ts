@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, AccountAdjustment, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan, CCMonthlyAnalysis, CCTransaction, CCMerchantMemory, MerchantMemoryEntry, CollegeKid, CollegeFVAccount, CollegeForecastYear, CollegeExpenseLine, CollegeExpenseCategory, CollegeContributionLine, UiPrefs } from '../types'
+import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, AccountAdjustment, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan, CCMonthlyAnalysis, CCTransaction, CCMerchantMemory, MerchantMemoryEntry, AmazonSubscribeItem, CollegeKid, CollegeFVAccount, CollegeForecastYear, CollegeExpenseLine, CollegeExpenseCategory, CollegeContributionLine, UiPrefs } from '../types'
 import { nextPeriodStart, prevPeriodStart, billIncludedInPeriod } from '../lib/periods'
 
 interface State {
@@ -52,11 +52,16 @@ interface State {
   // Credit card analysis
   ccAnalyses: CCMonthlyAnalysis[]
   ccMerchantMemory: CCMerchantMemory
+  amazonSSItems: AmazonSubscribeItem[]
   saveCCAnalysis: (analysis: CCMonthlyAnalysis) => void
   updateCCTransaction: (analysisId: string, txId: string, updates: Partial<CCTransaction>) => void
   dismissCCSuggestion: (analysisId: string, suggestionId: string) => void
   deleteCCAnalysis: (id: string) => void
   mergeCCMerchantMemory: (entries: CCMerchantMemory) => void
+  addAmazonSSItem: (item: Omit<AmazonSubscribeItem, 'id'>) => void
+  updateAmazonSSItem: (id: string, updates: Partial<AmazonSubscribeItem>) => void
+  deleteAmazonSSItem: (id: string) => void
+  applyAmazonSSMatch: (analysisId: string, matchedTxIds: string[]) => void
 
   resetStore: () => void
   resetPeriod: (periodId: string) => void
@@ -252,6 +257,7 @@ export const useStore = create<State>()(
       periodActuals: [],
       ccAnalyses: [],
       ccMerchantMemory: {},
+      amazonSSItems: [],
       ghostMode: false,
       wealthAccounts: SEED_WEALTH_ACCOUNTS,
       accountAdjustments: [],
@@ -269,6 +275,7 @@ export const useStore = create<State>()(
         ccOneOffOpen: true,
         ccAllTxOpen: false,
         ccExpandedCats: [],
+        ccSSListOpen: true,
         collegeYearUi: {},
         wealthTab: 'accounts',
         wealthAccountExpanded: {},
@@ -550,6 +557,36 @@ export const useStore = create<State>()(
 
       deleteCCAnalysis: (id) =>
         set(s => ({ ccAnalyses: s.ccAnalyses.filter(a => a.id !== id) })),
+
+      addAmazonSSItem: (item) =>
+        set(s => ({ amazonSSItems: [...s.amazonSSItems, { ...item, id: uid() }] })),
+
+      updateAmazonSSItem: (id, updates) =>
+        set(s => ({ amazonSSItems: s.amazonSSItems.map(i => i.id === id ? { ...i, ...updates } : i) })),
+
+      deleteAmazonSSItem: (id) =>
+        set(s => ({ amazonSSItems: s.amazonSSItems.filter(i => i.id !== id) })),
+
+      // Apply S&S match results: reclassify Rachel's Amazon charges in the analysis.
+      // matchedTxIds → isRecurring=true; remaining Rachel-Amazon charges → isRecurring=false.
+      // Charges outside that scope are left untouched.
+      applyAmazonSSMatch: (analysisId, matchedTxIds) =>
+        set(s => {
+          const matched = new Set(matchedTxIds)
+          return {
+            ccAnalyses: s.ccAnalyses.map(a => {
+              if (a.id !== analysisId) return a
+              return {
+                ...a,
+                transactions: a.transactions.map(t => {
+                  const inScope = t.category === 'Amazon' && t.person === 'Rachel'
+                  if (!inScope) return t
+                  return { ...t, isRecurring: matched.has(t.id) }
+                }),
+              }
+            }),
+          }
+        }),
 
       resetStore: () =>
         set({

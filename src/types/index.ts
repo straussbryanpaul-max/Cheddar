@@ -109,6 +109,16 @@ export interface CCMonthlyAnalysis {
   notes: string
 }
 
+// Persistent Amazon Subscribe & Save list — not tied to any single statement.
+// Used to reclassify Amazon charges as recurring vs one-off when a statement is loaded.
+export interface AmazonSubscribeItem {
+  id: string
+  name: string
+  amount: number              // expected per-shipment cost
+  frequencyMonths: number     // months between deliveries
+  lastDelivered: string       // YYYY-MM-DD of a known past delivery (anchor for extrapolation)
+}
+
 // ─── Wealth / Savings & Retirement ───────────────────────────────────────────
 
 export type AccountType =
@@ -248,6 +258,7 @@ export interface UiPrefs {
   ccOneOffOpen: boolean
   ccAllTxOpen: boolean
   ccExpandedCats: string[]
+  ccSSListOpen: boolean
   collegeYearUi: Record<string, { collapsed: boolean; contribsOpen: boolean; expensesOpen: boolean }>
   wealthTab: WealthTab
   wealthAccountExpanded: Record<string, boolean>

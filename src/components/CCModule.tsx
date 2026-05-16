@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react'
 import { useStore } from '../store'
 import { useAuth } from '../lib/auth'
-import { analyzeCreditCard, type StatementFile } from '../lib/analyzeCreditCard'
+import { analyzeCreditCard, matchAmazonSubscribeSave, type StatementFile } from '../lib/analyzeCreditCard'
 import { useFormatCurrency } from '../lib/useFormatCurrency'
 import { CCCharts } from './CCCharts'
-import type { CCMonthlyAnalysis, CCTransaction } from '../types'
+import type { CCMonthlyAnalysis, CCTransaction, AmazonSubscribeItem } from '../types'
 
 const CC_CATEGORIES = [
   'Groceries', 'Dining', 'Gas', 'Amazon',
@@ -49,6 +49,11 @@ export function CCModule() {
   const updateCCTransaction = useStore(s => s.updateCCTransaction)
   const dismissCCSuggestion = useStore(s => s.dismissCCSuggestion)
   const deleteCCAnalysis = useStore(s => s.deleteCCAnalysis)
+  const amazonSSItems = useStore(s => s.amazonSSItems)
+  const addAmazonSSItem = useStore(s => s.addAmazonSSItem)
+  const updateAmazonSSItem = useStore(s => s.updateAmazonSSItem)
+  const deleteAmazonSSItem = useStore(s => s.deleteAmazonSSItem)
+  const applyAmazonSSMatch = useStore(s => s.applyAmazonSSMatch)
 
   const sortedAnalyses = [...ccAnalyses].sort((a, b) => b.savedAt.localeCompare(a.savedAt) || b.id.localeCompare(a.id))
   const storedSelectedId = useStore(s => s.uiPrefs.ccSelectedId)
@@ -56,6 +61,7 @@ export function CCModule() {
   const oneOffOpen = useStore(s => s.uiPrefs.ccOneOffOpen)
   const allTxOpen = useStore(s => s.uiPrefs.ccAllTxOpen)
   const expandedCatsList = useStore(s => s.uiPrefs.ccExpandedCats)
+  const ssListOpen = useStore(s => s.uiPrefs.ccSSListOpen)
   const setUiPrefs = useStore(s => s.setUiPrefs)
   const expandedCats = new Set(expandedCatsList)
   const setExpandedCats = (next: Set<string> | ((prev: Set<string>) => Set<string>)) => {
@@ -70,15 +76,16 @@ export function CCModule() {
   const setRecurringOpen = (v: boolean | ((p: boolean) => boolean)) => setUiPrefs({ ccRecurringOpen: typeof v === 'function' ? v(recurringOpen) : v })
   const setOneOffOpen = (v: boolean | ((p: boolean) => boolean)) => setUiPrefs({ ccOneOffOpen: typeof v === 'function' ? v(oneOffOpen) : v })
   const setAllTxOpen = (v: boolean | ((p: boolean) => boolean)) => setUiPrefs({ ccAllTxOpen: typeof v === 'function' ? v(allTxOpen) : v })
+  const setSSListOpen = (v: boolean | ((p: boolean) => boolean)) => setUiPrefs({ ccSSListOpen: typeof v === 'function' ? v(ssListOpen) : v })
 
   const [step, setStep] = useState<Step>(ccAnalyses.length === 0 ? 'upload' : 'results')
   const [apiKeyDraft, setApiKeyDraft] = useState(anthropicApiKey)
   const [editingKey, setEditingKey] = useState(!anthropicApiKey)
   const [statementFile, setStatementFile] = useState<StatementFile | null>(null)
   const [statementFileName, setStatementFileName] = useState('')
-  const [amazonCsv, setAmazonCsv] = useState('')
-  const [amazonFileName, setAmazonFileName] = useState('')
   const [error, setError] = useState('')
+  const [matchRunning, setMatchRunning] = useState(false)
+  const [matchError, setMatchError] = useState('')
   const [editingCatTxId, setEditingCatTxId] = useState<string | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [personFilter, setPersonFilter] = useState<'All' | 'Bryan' | 'Rachel'>('All')
@@ -87,7 +94,6 @@ export function CCModule() {
   const [noteDraft, setNoteDraft] = useState('')
 
   const ccFileRef = useRef<HTMLInputElement>(null)
-  const amazonFileRef = useRef<HTMLInputElement>(null)
 
   const analysis = ccAnalyses.find(a => a.id === selectedId) ?? null
 
@@ -117,15 +123,6 @@ export function CCModule() {
     }
   }
 
-  function handleAmazonFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setAmazonFileName(file.name)
-    const reader = new FileReader()
-    reader.onload = ev => setAmazonCsv(ev.target?.result as string)
-    reader.readAsText(file)
-  }
-
   async function runAnalysis() {
     if (!statementFile) { setError('Please select a statement file first.'); return }
     const key = editingKey ? apiKeyDraft : anthropicApiKey
@@ -134,15 +131,50 @@ export function CCModule() {
     setError('')
     setStep('loading')
     try {
-      const result = await analyzeCreditCard(statementFile, amazonCsv || null, key, ccMerchantMemory)
+      const result = await analyzeCreditCard(statementFile, key, ccMerchantMemory)
       saveCCAnalysis(result)
       setSelectedId(result.id)
+
+      // Auto-run S&S match on the freshly imported statement.
+      if (amazonSSItems.length > 0) {
+        const candidates = result.transactions
+          .filter(tx => tx.category === 'Amazon' && tx.person === 'Rachel')
+          .map(tx => ({ id: tx.id, date: tx.date, amount: tx.amount }))
+        if (candidates.length > 0) {
+          try {
+            const matched = await matchAmazonSubscribeSave(amazonSSItems, candidates, result.statementRange, key)
+            applyAmazonSSMatch(result.id, matched)
+          } catch (e) {
+            console.error('Auto S&S match failed', e)
+          }
+        }
+      }
+
       setStep('results')
-      setStatementFile(null); setStatementFileName(''); setAmazonCsv(''); setAmazonFileName('')
+      setStatementFile(null); setStatementFileName('')
       setExpandedCats(new Set())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed')
       setStep('upload')
+    }
+  }
+
+  async function runMatch(target: CCMonthlyAnalysis) {
+    const key = anthropicApiKey
+    if (!key) { setMatchError('Set an Anthropic API key first.'); return }
+    if (amazonSSItems.length === 0) { setMatchError('Add at least one Subscribe & Save item.'); return }
+    setMatchError('')
+    setMatchRunning(true)
+    try {
+      const candidates = target.transactions
+        .filter(tx => tx.category === 'Amazon' && tx.person === 'Rachel')
+        .map(tx => ({ id: tx.id, date: tx.date, amount: tx.amount }))
+      const matched = await matchAmazonSubscribeSave(amazonSSItems, candidates, target.statementRange, key)
+      applyAmazonSSMatch(target.id, matched)
+    } catch (e) {
+      setMatchError(e instanceof Error ? e.message : 'Match failed')
+    } finally {
+      setMatchRunning(false)
     }
   }
 
@@ -205,25 +237,11 @@ export function CCModule() {
           </div>
         </div>
 
-        <div className="bg-slate-800 rounded-xl p-4">
-          <div className="flex items-center gap-1.5 mb-1">
-            <div className="text-xs text-slate-500 uppercase tracking-widest">Amazon Order History</div>
-            <div className="text-xs text-slate-600">optional</div>
+        {amazonSSItems.length > 0 && (
+          <div className="bg-slate-800/40 border border-slate-700/40 rounded-xl p-3 text-xs text-slate-500">
+            {amazonSSItems.length} Subscribe & Save {amazonSSItems.length === 1 ? 'item' : 'items'} on file — Amazon charges on Rachel's card will be auto-matched after analysis.
           </div>
-          <div className="text-xs text-slate-600 mb-3">Enables item-level categorization of Amazon charges. Download from Amazon → Account → Order History Reports → Request Report (CSV).</div>
-          <div className="border-2 border-dashed border-slate-700 rounded-xl p-4 text-center cursor-pointer hover:border-blue-500/40 transition-colors" onClick={() => amazonFileRef.current?.click()}>
-            <input ref={amazonFileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleAmazonFile} />
-            {amazonFileName ? (
-              <div>
-                <div className="text-emerald-400 text-sm font-medium">{amazonFileName}</div>
-                <div className="text-slate-500 text-xs mt-1">{amazonCsv.split('\n').length - 1} orders</div>
-                <button onClick={e => { e.stopPropagation(); setAmazonCsv(''); setAmazonFileName('') }} className="text-xs text-slate-600 hover:text-red-400 transition-colors mt-1">Remove</button>
-              </div>
-            ) : (
-              <div className="text-slate-600 text-sm">Click to add Amazon order history</div>
-            )}
-          </div>
-        </div>
+        )}
 
         {error && <div className="text-red-400 text-sm bg-red-900/20 border border-red-800/40 rounded-lg px-4 py-3">{error}</div>}
 
@@ -321,6 +339,20 @@ export function CCModule() {
           </button>
         </div>
       </div>
+
+      {/* Amazon Subscribe & Save list — persistent across all statements */}
+      <SubscribeSaveList
+        items={amazonSSItems}
+        open={ssListOpen}
+        onToggleOpen={() => setSSListOpen(v => !v)}
+        onAdd={addAmazonSSItem}
+        onUpdate={updateAmazonSSItem}
+        onDelete={deleteAmazonSSItem}
+        onRunMatch={() => runMatch(analysis)}
+        matchRunning={matchRunning}
+        matchError={matchError}
+        targetMonth={analysis.month}
+      />
 
       {/* Month tabs — always visible so you can see what's stored */}
       <div className="flex items-center gap-2 flex-wrap">
@@ -769,6 +801,173 @@ export function CCModule() {
 
       </div>{/* end two-column grid */}
       </>}{/* end results view */}
+    </div>
+  )
+}
+
+// ─── Subscribe & Save list section ───────────────────────────────────────────
+
+interface SSListProps {
+  items: AmazonSubscribeItem[]
+  open: boolean
+  onToggleOpen: () => void
+  onAdd: (item: Omit<AmazonSubscribeItem, 'id'>) => void
+  onUpdate: (id: string, updates: Partial<AmazonSubscribeItem>) => void
+  onDelete: (id: string) => void
+  onRunMatch: () => void
+  matchRunning: boolean
+  matchError: string
+  targetMonth: string
+}
+
+function SubscribeSaveList({
+  items, open, onToggleOpen, onAdd, onUpdate, onDelete,
+  onRunMatch, matchRunning, matchError, targetMonth,
+}: SSListProps) {
+  const [draftName, setDraftName] = useState('')
+  const [draftAmount, setDraftAmount] = useState('')
+  const [draftFreq, setDraftFreq] = useState('1')
+  const [draftLast, setDraftLast] = useState(new Date().toISOString().split('T')[0])
+
+  function commitAdd() {
+    const name = draftName.trim()
+    const amount = parseFloat(draftAmount)
+    const freq = parseInt(draftFreq, 10)
+    if (!name || !Number.isFinite(amount) || amount <= 0 || !Number.isFinite(freq) || freq <= 0 || !draftLast) return
+    onAdd({ name, amount, frequencyMonths: freq, lastDelivered: draftLast })
+    setDraftName(''); setDraftAmount(''); setDraftFreq('1'); setDraftLast(new Date().toISOString().split('T')[0])
+  }
+
+  return (
+    <div className="bg-slate-800 rounded-xl overflow-hidden">
+      <button
+        onClick={onToggleOpen}
+        className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-700/20 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Chevron open={open} className="text-slate-500" />
+          <span className="text-xs text-slate-300 font-medium uppercase tracking-widest">Amazon Subscribe & Save</span>
+          <span className="text-xs text-slate-600">{items.length} {items.length === 1 ? 'item' : 'items'}</span>
+        </div>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={(e) => { e.stopPropagation(); if (!matchRunning) onRunMatch() }}
+          onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && !matchRunning) { e.stopPropagation(); onRunMatch() } }}
+          className={`text-xs px-3 py-1 rounded-lg font-medium transition-colors ${matchRunning ? 'bg-slate-700 text-slate-500 cursor-wait' : 'bg-blue-600 hover:bg-blue-500 text-white cursor-pointer'}`}
+          title={`Re-run match against ${targetMonth}`}
+        >
+          {matchRunning ? 'Matching…' : `Run Match`}
+        </div>
+      </button>
+
+      {open && (
+        <div className="border-t border-slate-700/50">
+          {matchError && (
+            <div className="px-4 py-2 text-xs text-red-400 bg-red-900/20 border-b border-red-800/30">{matchError}</div>
+          )}
+
+          {/* Header row */}
+          <div className="px-4 py-2 grid grid-cols-[1fr_90px_80px_130px_24px] gap-2 items-center text-xs text-slate-600 uppercase tracking-widest border-b border-slate-700/30">
+            <div>Item</div>
+            <div className="text-right">Cost</div>
+            <div className="text-right">Every (mo)</div>
+            <div>Last Delivered</div>
+            <div />
+          </div>
+
+          {items.length === 0 && (
+            <div className="px-4 py-3 text-xs text-slate-500 italic">No items yet — add your Subscribe & Save items below.</div>
+          )}
+
+          {items.map(item => (
+            <div key={item.id} className="px-4 py-2 grid grid-cols-[1fr_90px_80px_130px_24px] gap-2 items-center border-b border-slate-700/20 last:border-b-0">
+              <input
+                className="bg-slate-700/50 text-sm text-slate-200 rounded px-2 py-1 border border-slate-600/50 focus:border-blue-500 outline-none"
+                value={item.name}
+                onChange={e => onUpdate(item.id, { name: e.target.value })}
+              />
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className="bg-slate-700/50 text-sm text-slate-200 rounded px-2 py-1 border border-slate-600/50 focus:border-blue-500 outline-none text-right tabular-nums"
+                value={item.amount}
+                onChange={e => onUpdate(item.id, { amount: parseFloat(e.target.value) || 0 })}
+              />
+              <input
+                type="number"
+                step="1"
+                min="1"
+                className="bg-slate-700/50 text-sm text-slate-200 rounded px-2 py-1 border border-slate-600/50 focus:border-blue-500 outline-none text-right tabular-nums"
+                value={item.frequencyMonths}
+                onChange={e => onUpdate(item.id, { frequencyMonths: parseInt(e.target.value, 10) || 1 })}
+              />
+              <input
+                type="date"
+                className="bg-slate-700/50 text-sm text-slate-200 rounded px-2 py-1 border border-slate-600/50 focus:border-blue-500 outline-none"
+                value={item.lastDelivered}
+                onChange={e => onUpdate(item.id, { lastDelivered: e.target.value })}
+              />
+              <button
+                onClick={() => onDelete(item.id)}
+                className="text-slate-600 hover:text-red-400 transition-colors"
+                title="Delete"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ))}
+
+          {/* Add row */}
+          <div className="px-4 py-2 grid grid-cols-[1fr_90px_80px_130px_24px] gap-2 items-center bg-slate-900/30">
+            <input
+              placeholder="New item name"
+              className="bg-slate-700/50 text-sm text-slate-200 rounded px-2 py-1 border border-slate-600/50 focus:border-blue-500 outline-none"
+              value={draftName}
+              onChange={e => setDraftName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') commitAdd() }}
+            />
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              className="bg-slate-700/50 text-sm text-slate-200 rounded px-2 py-1 border border-slate-600/50 focus:border-blue-500 outline-none text-right tabular-nums"
+              value={draftAmount}
+              onChange={e => setDraftAmount(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') commitAdd() }}
+            />
+            <input
+              type="number"
+              step="1"
+              min="1"
+              className="bg-slate-700/50 text-sm text-slate-200 rounded px-2 py-1 border border-slate-600/50 focus:border-blue-500 outline-none text-right tabular-nums"
+              value={draftFreq}
+              onChange={e => setDraftFreq(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') commitAdd() }}
+            />
+            <input
+              type="date"
+              className="bg-slate-700/50 text-sm text-slate-200 rounded px-2 py-1 border border-slate-600/50 focus:border-blue-500 outline-none"
+              value={draftLast}
+              onChange={e => setDraftLast(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') commitAdd() }}
+            />
+            <button
+              onClick={commitAdd}
+              className="text-slate-500 hover:text-emerald-400 transition-colors"
+              title="Add item"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

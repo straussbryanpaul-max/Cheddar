@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import type { CCMonthlyAnalysis, CCTransaction, CCMerchantMemory } from '../types'
+import type { CCMonthlyAnalysis, CCTransaction, CCMerchantMemory, AmazonSubscribeItem } from '../types'
 
 export type StatementFile =
   | { type: 'csv'; content: string }
@@ -14,9 +14,6 @@ interface RawTransaction {
   category: string
   isRecurring: boolean
   person?: string | null
-  isAmazon?: boolean
-  amazonType?: CCTransaction['amazonType']
-  amazonItemDescription?: string | null
 }
 
 interface RawAnalysis {
@@ -71,15 +68,10 @@ function buildMemorySection(memory: CCMerchantMemory): string {
 
 export async function analyzeCreditCard(
   statement: StatementFile,
-  amazonCsvContent: string | null,
   apiKey: string,
   merchantMemory: CCMerchantMemory = {},
 ): Promise<CCMonthlyAnalysis> {
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true })
-
-  const amazonSection = amazonCsvContent
-    ? `\n\nAmazon Order History CSV:\n\`\`\`\n${amazonCsvContent}\n\`\`\``
-    : ''
 
   const memorySection = buildMemorySection(merchantMemory)
   const fullPrompt = ANALYSIS_PROMPT + memorySection
@@ -88,11 +80,10 @@ export async function analyzeCreditCard(
     statement.type === 'pdf'
       ? [
           { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: statement.base64 } },
-          { type: 'text', text: fullPrompt + amazonSection },
+          { type: 'text', text: fullPrompt },
         ]
       : fullPrompt +
-        `\n\nBarclays CC statement CSV:\n\`\`\`\n${statement.content}\n\`\`\`` +
-        amazonSection
+        `\n\nBarclays CC statement CSV:\n\`\`\`\n${statement.content}\n\`\`\``
 
   const stream = client.messages.stream({
     model: 'claude-opus-4-7',
@@ -122,9 +113,9 @@ export async function analyzeCreditCard(
     category: tx.category,
     aiIsRecurring: tx.isRecurring,
     isRecurring: tx.isRecurring,
-    isAmazon: tx.isAmazon ?? false,
-    amazonType: tx.amazonType ?? null,
-    amazonItemDescription: tx.amazonItemDescription ?? null,
+    isAmazon: false,
+    amazonType: null,
+    amazonItemDescription: null,
     person: (tx.person as CCTransaction['person']) ?? null,
     flagged: false,
   }))
@@ -140,4 +131,82 @@ export async function analyzeCreditCard(
     transactions,
     reductionSuggestions: parsed.reductionSuggestions,
   }
+}
+
+// ─── Amazon Subscribe & Save matching ────────────────────────────────────────
+
+interface SSMatchCandidate {
+  id: string
+  date: string
+  amount: number
+}
+
+const SS_MATCH_PROMPT = `You match Amazon Subscribe & Save deliveries against credit card charges.
+
+You are given:
+1. A persistent list of Subscribe & Save items, each with an expected per-shipment cost, a delivery frequency in months, and a known past delivery date. From the past date and frequency you can extrapolate all expected delivery dates (e.g. lastDelivered=2025-07-12, frequencyMonths=2 → expect deliveries in Sep, Nov, Jan, Mar, May ... in both directions).
+2. A statement period (date range).
+3. A list of Amazon charges on Rachel's card that fell inside that period.
+
+Decide which charges are Subscribe & Save deliveries vs one-off Amazon purchases:
+- A charge is a Subscribe & Save match if its amount is close to a list item's amount (within ~$1 or ~10%, accounting for small tax/price drift) AND an extrapolated delivery from that item is expected within the statement period (±10 days slack).
+- Multiple charges may match the same item if the cadence places multiple deliveries in the period (rare, but possible).
+- A single charge can only match one item.
+- Charges that don't satisfy both conditions are one-offs.
+
+Return ONLY this JSON (no markdown):
+{
+  "matches": [
+    {"txId": "tx5", "itemName": "Coffee Pods"},
+    {"txId": "tx9", "itemName": "Dog Food"}
+  ]
+}
+
+Only include matched charges in the array. Charges not in the array are treated as one-offs.`
+
+export async function matchAmazonSubscribeSave(
+  items: AmazonSubscribeItem[],
+  candidates: SSMatchCandidate[],
+  statementRange: string,
+  apiKey: string,
+): Promise<string[]> {
+  if (items.length === 0 || candidates.length === 0) return []
+
+  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true })
+
+  const itemsBlock = items
+    .map(i => `  - ${i.name}: $${i.amount.toFixed(2)}, every ${i.frequencyMonths} month(s), lastDelivered ${i.lastDelivered}`)
+    .join('\n')
+
+  const candidatesBlock = candidates
+    .map(c => `  - id=${c.id}, date=${c.date}, amount=$${c.amount.toFixed(2)}`)
+    .join('\n')
+
+  const userText = `${SS_MATCH_PROMPT}
+
+Statement period: ${statementRange}
+
+Subscribe & Save list:
+${itemsBlock}
+
+Amazon charges on Rachel's card during this period:
+${candidatesBlock}`
+
+  const stream = client.messages.stream({
+    model: 'claude-opus-4-7',
+    max_tokens: 4000,
+    messages: [{ role: 'user', content: userText }],
+  })
+
+  const response = await stream.finalMessage()
+  const textBlock = response.content.find(b => b.type === 'text')
+  if (!textBlock || textBlock.type !== 'text') throw new Error('No text response from Claude')
+
+  const raw = textBlock.text
+  const start = raw.indexOf('{')
+  const end = raw.lastIndexOf('}')
+  if (start === -1 || end === -1) throw new Error('No JSON found in response')
+
+  const parsed = JSON.parse(raw.slice(start, end + 1)) as { matches: { txId: string; itemName: string }[] }
+  return parsed.matches.map(m => m.txId)
 }
