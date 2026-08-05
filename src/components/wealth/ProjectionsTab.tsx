@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useStore } from '../../store'
 import { useFormatCurrency } from '../../lib/useFormatCurrency'
-import { computeFV, MILESTONE_YEARS, MILESTONE_LABELS, addYears } from '../../lib/wealth'
-import type { ProjectionCalcAccount, SnapshotMilestoneLabel, WealthAccount } from '../../types'
+import { computeFV, addYears } from '../../lib/wealth'
+import type { ProjectionCalcAccount, WealthAccount } from '../../types'
 
 const inputCls = 'bg-slate-700 text-white text-sm rounded px-2 py-1 border border-slate-600 outline-none focus:border-blue-400 w-full'
 
@@ -168,6 +168,7 @@ export function ProjectionsTab() {
   const updateSnapshotMilestone = useStore(s => s.updateSnapshotMilestone)
 
   const [fvHorizon, setFvHorizon] = useState(10)
+  const [customYears, setCustomYears] = useState('')
   const [snapshotName, setSnapshotName] = useState('')
   const [takingSnapshot, setTakingSnapshot] = useState(false)
 
@@ -184,14 +185,13 @@ export function ProjectionsTab() {
     addSnapshot({
       name: snapshotName.trim() || `Snapshot ${today}`,
       snapshotDate: today,
-      milestones: MILESTONE_LABELS.map(label => ({
-        label,
-        targetDate: addYears(today, MILESTONE_YEARS[label]),
-        projected: calcAccounts.reduce((sum, c) =>
-          sum + computeFV(effectivePV(c), c.annualRate, c.annualContribution, c.periodsPerYear, MILESTONE_YEARS[label]), 0),
+      milestones: [{
+        label: `${fvHorizon}yr`,
+        targetDate: addYears(today, fvHorizon),
+        projected: totalFV,
         actual: null,
         actualDate: null,
-      })),
+      }],
     })
     setTakingSnapshot(false)
     setSnapshotName('')
@@ -212,14 +212,30 @@ export function ProjectionsTab() {
               {FV_HORIZONS.map(h => (
                 <button
                   key={h.years}
-                  onClick={() => setFvHorizon(h.years)}
+                  onClick={() => { setFvHorizon(h.years); setCustomYears('') }}
                   className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
-                    fvHorizon === h.years ? 'bg-slate-500 text-white' : 'text-slate-400 hover:text-white'
+                    fvHorizon === h.years && customYears === '' ? 'bg-slate-500 text-white' : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   {h.label}
                 </button>
               ))}
+              <input
+                type="number"
+                min={1}
+                max={100}
+                placeholder="Custom"
+                value={customYears}
+                onChange={e => {
+                  const raw = e.target.value
+                  setCustomYears(raw)
+                  const v = parseInt(raw, 10)
+                  if (!isNaN(v) && v > 0) setFvHorizon(v)
+                }}
+                className={`w-16 text-xs rounded px-1.5 py-0.5 outline-none text-center placeholder:text-slate-500 ${
+                  customYears !== '' ? 'bg-slate-500 text-white' : 'bg-slate-800 text-slate-300'
+                }`}
+              />
             </div>
             {/* Take Snapshot */}
             {takingSnapshot ? (

@@ -163,7 +163,7 @@ export interface ProjectionCalcAccount {
   periodsPerYear: number
 }
 
-export type SnapshotMilestoneLabel = 'Today' | '1yr' | '3yr' | '5yr' | '10yr' | '15yr' | '20yr'
+export type SnapshotMilestoneLabel = string
 
 export interface SnapshotMilestone {
   label: SnapshotMilestoneLabel

@@ -1,5 +1,3 @@
-import type { SnapshotMilestoneLabel } from '../types'
-
 export function computeFV(
   presentValue: number,
   annualRate: number,
@@ -13,18 +11,6 @@ export function computeFV(
   const factor = Math.pow(1 + rn, periodsPerYear * years)
   return presentValue * factor + (annualContribution / periodsPerYear) * (factor - 1) / rn
 }
-
-export const MILESTONE_YEARS: Record<SnapshotMilestoneLabel, number> = {
-  Today: 0,
-  '1yr': 1,
-  '3yr': 3,
-  '5yr': 5,
-  '10yr': 10,
-  '15yr': 15,
-  '20yr': 20,
-}
-
-export const MILESTONE_LABELS: SnapshotMilestoneLabel[] = ['Today', '1yr', '3yr', '5yr', '10yr', '15yr', '20yr']
 
 export function addYears(isoDate: string, years: number): string {
   const d = new Date(isoDate + 'T00:00:00')

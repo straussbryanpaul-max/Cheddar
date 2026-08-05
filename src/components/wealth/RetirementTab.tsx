@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../../store'
 import { useFormatCurrency } from '../../lib/useFormatCurrency'
-import { MILESTONE_LABELS } from '../../lib/wealth'
 import type { RetirementExpense } from '../../types'
 
 const inputCls = 'bg-slate-700 text-white text-sm rounded px-2 py-1 border border-slate-600 outline-none focus:border-blue-400'
@@ -282,15 +281,11 @@ export function RetirementTab() {
                         onChange={e => updateRetirementPlan({ snapshotMilestone: e.target.value as typeof plan.snapshotMilestone || null })}
                       >
                         <option value="">Pick milestone…</option>
-                        {MILESTONE_LABELS.map(l => {
-                          const m = selectedSnapshot.milestones.find(m => m.label === l)
-                          if (!m) return null
-                          return (
-                            <option key={l} value={l}>
-                              {l} — {m.actual !== null ? `actual ${fmt(m.actual)}` : `projected ${fmt(m.projected)}`}
-                            </option>
-                          )
-                        })}
+                        {selectedSnapshot.milestones.map(m => (
+                          <option key={m.label} value={m.label}>
+                            {m.label} — {m.actual !== null ? `actual ${fmt(m.actual)}` : `projected ${fmt(m.projected)}`}
+                          </option>
+                        ))}
                       </select>
                     )}
 
