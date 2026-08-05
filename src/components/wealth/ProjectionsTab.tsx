@@ -108,6 +108,10 @@ function CalcRow({ account, wealthAccounts, fvHorizon }: {
   )
 }
 
+function freqLabel(periodsPerYear: number): string {
+  return `${periodsPerYear}×/yr`
+}
+
 function MilestoneActualCell({ snapshotId, label, actual, actualDate }: {
   snapshotId: string
   label: string
@@ -185,6 +189,14 @@ export function ProjectionsTab() {
     addSnapshot({
       name: snapshotName.trim() || `Snapshot ${today}`,
       snapshotDate: today,
+      accounts: calcAccounts.map(c => ({
+        name: c.name,
+        presentValue: effectivePV(c),
+        annualRate: c.annualRate,
+        annualContribution: c.annualContribution,
+        periodsPerYear: c.periodsPerYear,
+        fv: computeFV(effectivePV(c), c.annualRate, c.annualContribution, c.periodsPerYear, fvHorizon),
+      })),
       milestones: [{
         label: `${fvHorizon}yr`,
         targetDate: addYears(today, fvHorizon),
@@ -352,6 +364,34 @@ export function ProjectionsTab() {
                   </svg>
                 </button>
               </div>
+              {snap.accounts?.length > 0 && (
+                <div className="overflow-x-auto px-6 pt-4">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-xs text-slate-500 uppercase tracking-widest border-b border-slate-700/50">
+                        <th className="text-left pb-2 pr-2 font-normal">Account</th>
+                        <th className="text-left pb-2 px-2 font-normal">Present Value</th>
+                        <th className="text-left pb-2 px-2 font-normal">Rate</th>
+                        <th className="text-left pb-2 px-2 font-normal">Annual Contrib</th>
+                        <th className="text-left pb-2 px-2 font-normal">Freq</th>
+                        <th className="text-right pb-2 pl-2 font-normal">FV</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {snap.accounts.map((a, i) => (
+                        <tr key={i} className="border-b border-slate-700/30 last:border-0">
+                          <td className="py-2 pr-2 text-slate-300">{a.name || 'Untitled'}</td>
+                          <td className="py-2 px-2 text-slate-300 tabular-nums">{fmt(a.presentValue)}</td>
+                          <td className="py-2 px-2 text-slate-300 tabular-nums">{(a.annualRate * 100).toFixed(a.annualRate * 100 % 1 === 0 ? 0 : 1)}%</td>
+                          <td className="py-2 px-2 text-slate-300 tabular-nums">{fmt(a.annualContribution)}</td>
+                          <td className="py-2 px-2 text-slate-300">{freqLabel(a.periodsPerYear)}</td>
+                          <td className="py-2 pl-2 text-right tabular-nums text-emerald-300 font-medium">{fmt(a.fv)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
               <div className="overflow-x-auto px-6 py-4">
                 <table className="w-full text-sm">
                   <thead>

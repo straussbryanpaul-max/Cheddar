@@ -173,10 +173,20 @@ export interface SnapshotMilestone {
   actualDate: string | null
 }
 
+export interface SnapshotAccount {
+  name: string
+  presentValue: number
+  annualRate: number
+  annualContribution: number
+  periodsPerYear: number
+  fv: number
+}
+
 export interface ProjectionSnapshot {
   id: string
   name: string
   snapshotDate: string
+  accounts: SnapshotAccount[]
   milestones: SnapshotMilestone[]
 }
 
