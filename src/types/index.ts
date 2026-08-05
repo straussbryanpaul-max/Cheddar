@@ -161,6 +161,7 @@ export interface ProjectionCalcAccount {
   annualRate: number
   annualContribution: number
   periodsPerYear: number
+  yearsOverride: number | null
 }
 
 export type SnapshotMilestoneLabel = string
@@ -179,6 +180,7 @@ export interface SnapshotAccount {
   annualRate: number
   annualContribution: number
   periodsPerYear: number
+  years: number
   fv: number
 }
 

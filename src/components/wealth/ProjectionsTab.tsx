@@ -25,8 +25,9 @@ function CalcRow({ account, wealthAccounts, fvHorizon }: {
     ? wealthAccounts.find(a => a.id === account.linkedAccountId)
     : null
   const effectivePV = linkedAccount?.balance ?? account.presentValue
+  const years = account.yearsOverride ?? fvHorizon
 
-  const fv = computeFV(effectivePV, account.annualRate, account.annualContribution, account.periodsPerYear, fvHorizon)
+  const fv = computeFV(effectivePV, account.annualRate, account.annualContribution, account.periodsPerYear, years)
 
   return (
     <tr className="border-b border-slate-700/40 group">
@@ -88,6 +89,23 @@ function CalcRow({ account, wealthAccounts, fvHorizon }: {
           <option value={12}>12×/yr</option>
           <option value={26}>26×/yr</option>
         </select>
+      </td>
+      <td className="py-2 px-2">
+        <input
+          type="number"
+          min={1}
+          max={100}
+          className={`${inputCls} text-center ${account.yearsOverride !== null ? 'border-blue-400' : ''}`}
+          value={account.yearsOverride ?? ''}
+          placeholder={String(fvHorizon)}
+          onChange={e => {
+            const raw = e.target.value
+            if (raw === '') { updateCalcAccount(account.id, { yearsOverride: null }); return }
+            const v = parseInt(raw, 10)
+            if (!isNaN(v) && v > 0) updateCalcAccount(account.id, { yearsOverride: v })
+          }}
+          title="Override years for this account only"
+        />
       </td>
       <td className="py-2 pl-2 text-right tabular-nums text-emerald-300 text-sm font-medium">
         {fmt(fv)}
@@ -182,7 +200,7 @@ export function ProjectionsTab() {
   }
 
   const totalFV = calcAccounts.reduce((sum, c) =>
-    sum + computeFV(effectivePV(c), c.annualRate, c.annualContribution, c.periodsPerYear, fvHorizon), 0)
+    sum + computeFV(effectivePV(c), c.annualRate, c.annualContribution, c.periodsPerYear, c.yearsOverride ?? fvHorizon), 0)
 
   function takeSnapshot() {
     const today = new Date().toISOString().split('T')[0]
@@ -195,7 +213,8 @@ export function ProjectionsTab() {
         annualRate: c.annualRate,
         annualContribution: c.annualContribution,
         periodsPerYear: c.periodsPerYear,
-        fv: computeFV(effectivePV(c), c.annualRate, c.annualContribution, c.periodsPerYear, fvHorizon),
+        years: c.yearsOverride ?? fvHorizon,
+        fv: computeFV(effectivePV(c), c.annualRate, c.annualContribution, c.periodsPerYear, c.yearsOverride ?? fvHorizon),
       })),
       milestones: [{
         label: `${fvHorizon}yr`,
@@ -283,9 +302,8 @@ export function ProjectionsTab() {
                 <th className="text-left pb-2 px-2 font-normal">Rate</th>
                 <th className="text-left pb-2 px-2 font-normal">Annual Contrib</th>
                 <th className="text-left pb-2 px-2 font-normal">Freq</th>
-                <th className="text-right pb-2 pl-2 font-normal">
-                  FV ({fvHorizon}yr)
-                </th>
+                <th className="text-left pb-2 px-2 font-normal">Years</th>
+                <th className="text-right pb-2 pl-2 font-normal">FV</th>
                 <th className="pb-2 pl-2 w-6" />
               </tr>
             </thead>
@@ -297,7 +315,7 @@ export function ProjectionsTab() {
             {calcAccounts.length > 0 && (
               <tfoot>
                 <tr className="border-t border-slate-600">
-                  <td colSpan={5} className="pt-3 text-xs text-slate-500 uppercase tracking-widest">Total</td>
+                  <td colSpan={6} className="pt-3 text-xs text-slate-500 uppercase tracking-widest">Total</td>
                   <td className="pt-3 text-right tabular-nums text-emerald-300 font-bold">{fmt(totalFV)}</td>
                   <td />
                 </tr>
@@ -319,7 +337,7 @@ export function ProjectionsTab() {
                   {available.map(a => (
                     <button
                       key={a.id}
-                      onClick={() => addCalcAccount({ name: `${a.institution} ${a.name}`, linkedAccountId: a.id, presentValue: a.balance, annualRate: 0.07, annualContribution: 0, periodsPerYear: 1 })}
+                      onClick={() => addCalcAccount({ name: `${a.institution} ${a.name}`, linkedAccountId: a.id, presentValue: a.balance, annualRate: 0.07, annualContribution: 0, periodsPerYear: 1, yearsOverride: null })}
                       className="flex items-center gap-1.5 text-xs bg-slate-700/60 hover:bg-slate-600 text-slate-300 rounded-lg px-3 py-1.5 transition-colors"
                     >
                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -332,7 +350,7 @@ export function ProjectionsTab() {
               ) : null
             })()}
             <button
-              onClick={() => addCalcAccount({ name: '', linkedAccountId: null, presentValue: 0, annualRate: 0.07, annualContribution: 0, periodsPerYear: 1 })}
+              onClick={() => addCalcAccount({ name: '', linkedAccountId: null, presentValue: 0, annualRate: 0.07, annualContribution: 0, periodsPerYear: 1, yearsOverride: null })}
               className="flex items-center gap-2 text-sm text-slate-500 hover:text-emerald-400 transition-colors py-1"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -374,6 +392,7 @@ export function ProjectionsTab() {
                         <th className="text-left pb-2 px-2 font-normal">Rate</th>
                         <th className="text-left pb-2 px-2 font-normal">Annual Contrib</th>
                         <th className="text-left pb-2 px-2 font-normal">Freq</th>
+                        <th className="text-left pb-2 px-2 font-normal">Years</th>
                         <th className="text-right pb-2 pl-2 font-normal">FV</th>
                       </tr>
                     </thead>
@@ -385,6 +404,7 @@ export function ProjectionsTab() {
                           <td className="py-2 px-2 text-slate-300 tabular-nums">{(a.annualRate * 100).toFixed(a.annualRate * 100 % 1 === 0 ? 0 : 1)}%</td>
                           <td className="py-2 px-2 text-slate-300 tabular-nums">{fmt(a.annualContribution)}</td>
                           <td className="py-2 px-2 text-slate-300">{freqLabel(a.periodsPerYear)}</td>
+                          <td className="py-2 px-2 text-slate-300 tabular-nums">{a.years ?? '—'}</td>
                           <td className="py-2 pl-2 text-right tabular-nums text-emerald-300 font-medium">{fmt(a.fv)}</td>
                         </tr>
                       ))}
