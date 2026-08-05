@@ -208,6 +208,8 @@ export interface RetirementPlan {
   portfolioReturnRate: number   // annual rate during drawdown, e.g. 0.05
   ordinaryIncomeTaxRate: number   // applied to tax-deferred withdrawals (traditional IRA/401k/403b)
   capitalGainsTaxRate: number     // applied to taxable brokerage withdrawals
+  inflationAdjusted: boolean       // when true, expenses (net of SS) are assumed to grow with inflation
+  inflationRate: number            // annual inflation assumption, e.g. 0.03
   savingsSource: 'accounts' | 'snapshot'
   snapshotId: string | null
   snapshotMilestone: SnapshotMilestoneLabel | null

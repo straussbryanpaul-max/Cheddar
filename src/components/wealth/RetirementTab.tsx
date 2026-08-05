@@ -74,6 +74,8 @@ export function RetirementTab() {
   const [ordinaryTaxDraft, setOrdinaryTaxDraft] = useState('')
   const [editingCapGainsTax, setEditingCapGainsTax] = useState(false)
   const [capGainsTaxDraft, setCapGainsTaxDraft] = useState('')
+  const [editingInflation, setEditingInflation] = useState(false)
+  const [inflationDraft, setInflationDraft] = useState('')
 
   const monthlyTotal = plan.expenses.reduce((s, e) => s + e.monthlyAmount, 0)
   const annualExpenses = monthlyTotal * 12
@@ -136,19 +138,29 @@ export function RetirementTab() {
     ? (taxBuckets.tax_deferred * ordinaryIncomeTaxRate + taxBuckets.taxable * capitalGainsTaxRate) / totalRetirementSavings
     : 0
 
-  // Annuity depletion formula: years until portfolio hits zero given growth rate r
-  // n = -ln(1 - r*P/W) / ln(1+r)  (falls back to P/W when r=0)
+  // Annuity depletion formula: years until portfolio hits zero given growth rate r.
+  // n = ln(W / (W - r*P)) / ln(1+r), which reduces to P/W at the r=0 singularity.
+  // Works for negative r too (e.g. real return net of inflation) — growth just
+  // subtracts from the balance each year instead of adding to it.
   function calcFundedYears(P: number, W: number, r: number): number | null {
     if (W <= 0) return null
-    if (r <= 0) return P / W
+    if (r === 0) return P / W
     if (r * P >= W) return Infinity   // portfolio grows faster than draw — never depletes
-    return -Math.log(1 - (r * P) / W) / Math.log(1 + r)
+    return Math.log(W / (W - r * P)) / Math.log(1 + r)
   }
 
   const r = plan.portfolioReturnRate ?? 0
+  const inflationAdjusted = plan.inflationAdjusted ?? false
+  const inflationRate = plan.inflationRate ?? 0.03
+  // Model inflation by converting to a real (inflation-adjusted) return rate and holding
+  // the withdrawal constant in today's dollars — mathematically equivalent to a nominal
+  // withdrawal that grows with inflation each year, and reuses the same formula above.
+  // Assumes expenses and Social Security both scale with inflation, leaving the real net
+  // draw unchanged.
+  const effectiveReturnRate = inflationAdjusted ? (1 + r) / (1 + inflationRate) - 1 : r
   // Gross up the after-tax spending need into the pre-tax amount that must be withdrawn.
   const grossAnnualDraw = blendedTaxRate < 1 ? annualNetDraw / (1 - blendedTaxRate) : annualNetDraw
-  const fundedYears = calcFundedYears(totalRetirementSavings, grossAnnualDraw, r)
+  const fundedYears = calcFundedYears(totalRetirementSavings, grossAnnualDraw, effectiveReturnRate)
   const fundedColor =
     fundedYears === null || fundedYears === Infinity ? 'text-emerald-400' :
     fundedYears > 25 ? 'text-emerald-400' :
@@ -177,6 +189,12 @@ export function RetirementTab() {
     const val = parseFloat(capGainsTaxDraft) / 100
     if (!isNaN(val)) updateRetirementPlan({ capitalGainsTaxRate: Math.max(0, val) })
     setEditingCapGainsTax(false)
+  }
+
+  function commitInflation() {
+    const val = parseFloat(inflationDraft) / 100
+    if (!isNaN(val)) updateRetirementPlan({ inflationRate: Math.max(0, val) })
+    setEditingInflation(false)
   }
 
   return (
@@ -328,6 +346,41 @@ export function RetirementTab() {
             </button>
           )}
         </div>
+        <div className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-700/30">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={inflationAdjusted}
+              onChange={e => updateRetirementPlan({ inflationAdjusted: e.target.checked })}
+              className="accent-blue-500"
+            />
+            <span className="text-sm text-slate-200">Adjust for Inflation</span>
+            <span className="text-xs text-slate-500">expenses grow with inflation each year</span>
+          </label>
+          {inflationAdjusted && (
+            editingInflation ? (
+              <div className="flex items-center gap-1">
+                <input
+                  autoFocus
+                  className="bg-slate-700 text-white text-sm rounded px-2 py-1 border border-blue-500 outline-none w-20 text-right"
+                  value={inflationDraft}
+                  onChange={e => setInflationDraft(e.target.value)}
+                  onBlur={commitInflation}
+                  onKeyDown={e => { if (e.key === 'Enter') commitInflation(); if (e.key === 'Escape') setEditingInflation(false) }}
+                />
+                <span className="text-slate-400 text-sm">%</span>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setInflationDraft((inflationRate * 100).toFixed(1)); setEditingInflation(true) }}
+                className="text-sm text-slate-300 hover:text-blue-300 tabular-nums transition-colors"
+              >
+                {(inflationRate * 100).toFixed(1)}%
+              </button>
+            )
+          )}
+        </div>
       </div>
 
       {/* Savings source */}
@@ -458,6 +511,7 @@ export function RetirementTab() {
               <div className="text-xs text-slate-500 mb-0.5">Funded Years of Retirement</div>
               <div className="text-xs text-slate-500">
                 {r > 0 ? `${(r * 100).toFixed(1)}% return` : 'No growth assumed'}
+                {inflationAdjusted && ` · ${(inflationRate * 100).toFixed(1)}% inflation → ${(effectiveReturnRate * 100).toFixed(1)}% real`}
                 {' · '}{(blendedTaxRate * 100).toFixed(1)}% blended tax on withdrawals
               </div>
             </div>
