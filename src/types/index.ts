@@ -153,6 +153,8 @@ export interface AccountAdjustment {
   date: string
 }
 
+export type TaxTreatment = 'tax_free' | 'tax_deferred' | 'taxable'
+
 export interface ProjectionCalcAccount {
   id: string
   name: string
@@ -162,6 +164,7 @@ export interface ProjectionCalcAccount {
   annualContribution: number
   periodsPerYear: number
   yearsOverride: number | null
+  taxTreatment: TaxTreatment
 }
 
 export type SnapshotMilestoneLabel = string
@@ -181,6 +184,7 @@ export interface SnapshotAccount {
   annualContribution: number
   periodsPerYear: number
   years: number
+  taxTreatment: TaxTreatment
   fv: number
 }
 
@@ -202,6 +206,8 @@ export interface RetirementPlan {
   expenses: RetirementExpense[]
   socialSecurityAnnual: number
   portfolioReturnRate: number   // annual rate during drawdown, e.g. 0.05
+  ordinaryIncomeTaxRate: number   // applied to tax-deferred withdrawals (traditional IRA/401k/403b)
+  capitalGainsTaxRate: number     // applied to taxable brokerage withdrawals
   savingsSource: 'accounts' | 'snapshot'
   snapshotId: string | null
   snapshotMilestone: SnapshotMilestoneLabel | null

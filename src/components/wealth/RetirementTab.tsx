@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useStore } from '../../store'
 import { useFormatCurrency } from '../../lib/useFormatCurrency'
-import type { RetirementExpense } from '../../types'
+import { defaultTaxTreatment } from '../../lib/wealth'
+import type { RetirementExpense, TaxTreatment } from '../../types'
 
 const inputCls = 'bg-slate-700 text-white text-sm rounded px-2 py-1 border border-slate-600 outline-none focus:border-blue-400'
 const selectCls = 'bg-slate-700 text-white text-sm rounded px-2 py-1 border border-slate-600 outline-none focus:border-blue-400'
@@ -69,6 +70,10 @@ export function RetirementTab() {
   const [ssDraft, setSsDraft] = useState('')
   const [editingRate, setEditingRate] = useState(false)
   const [rateDraft, setRateDraft] = useState('')
+  const [editingOrdinaryTax, setEditingOrdinaryTax] = useState(false)
+  const [ordinaryTaxDraft, setOrdinaryTaxDraft] = useState('')
+  const [editingCapGainsTax, setEditingCapGainsTax] = useState(false)
+  const [capGainsTaxDraft, setCapGainsTaxDraft] = useState('')
 
   const monthlyTotal = plan.expenses.reduce((s, e) => s + e.monthlyAmount, 0)
   const annualExpenses = monthlyTotal * 12
@@ -100,6 +105,37 @@ export function RetirementTab() {
       ? `${selectedSnapshot?.name} — ${plan.snapshotMilestone} ${plan.useSnapshotActual && selectedMilestone.actual !== null ? '(actual)' : '(projected)'}`
       : 'Accounts tagged "Retirement"'
 
+  // Bucket retirement savings by tax treatment so withdrawals can be taxed accordingly.
+  // Traditional IRA/401k/403b are taxed as ordinary income; brokerage at capital-gains
+  // rates; Roth/HSA/cash are treated as already-taxed. For the snapshot source, the
+  // milestone total may be an "actual" figure that differs from the projected sum of
+  // its accounts — in that case the projected per-account tax mix is scaled onto the
+  // actual total, since we don't have an actual breakdown per account.
+  const taxBuckets: Record<TaxTreatment, number> = { tax_free: 0, tax_deferred: 0, taxable: 0 }
+  if (plan.savingsSource === 'snapshot' && selectedSnapshot && snapshotValue !== null) {
+    for (const a of selectedSnapshot.accounts) {
+      taxBuckets[a.taxTreatment ?? 'tax_deferred'] += a.fv
+    }
+    const projectedTotal = taxBuckets.tax_free + taxBuckets.tax_deferred + taxBuckets.taxable
+    if (projectedTotal > 0 && totalRetirementSavings !== projectedTotal) {
+      const scale = totalRetirementSavings / projectedTotal
+      taxBuckets.tax_free *= scale
+      taxBuckets.tax_deferred *= scale
+      taxBuckets.taxable *= scale
+    }
+  } else {
+    for (const a of wealthAccounts) {
+      if (a.category !== 'retirement') continue
+      taxBuckets[defaultTaxTreatment(a.type)] += a.balance
+    }
+  }
+
+  const ordinaryIncomeTaxRate = plan.ordinaryIncomeTaxRate ?? 0.22
+  const capitalGainsTaxRate = plan.capitalGainsTaxRate ?? 0.15
+  const blendedTaxRate = totalRetirementSavings > 0
+    ? (taxBuckets.tax_deferred * ordinaryIncomeTaxRate + taxBuckets.taxable * capitalGainsTaxRate) / totalRetirementSavings
+    : 0
+
   // Annuity depletion formula: years until portfolio hits zero given growth rate r
   // n = -ln(1 - r*P/W) / ln(1+r)  (falls back to P/W when r=0)
   function calcFundedYears(P: number, W: number, r: number): number | null {
@@ -110,7 +146,9 @@ export function RetirementTab() {
   }
 
   const r = plan.portfolioReturnRate ?? 0
-  const fundedYears = calcFundedYears(totalRetirementSavings, annualNetDraw, r)
+  // Gross up the after-tax spending need into the pre-tax amount that must be withdrawn.
+  const grossAnnualDraw = blendedTaxRate < 1 ? annualNetDraw / (1 - blendedTaxRate) : annualNetDraw
+  const fundedYears = calcFundedYears(totalRetirementSavings, grossAnnualDraw, r)
   const fundedColor =
     fundedYears === null || fundedYears === Infinity ? 'text-emerald-400' :
     fundedYears > 25 ? 'text-emerald-400' :
@@ -127,6 +165,18 @@ export function RetirementTab() {
     const val = parseFloat(rateDraft) / 100
     if (!isNaN(val)) updateRetirementPlan({ portfolioReturnRate: Math.max(0, val) })
     setEditingRate(false)
+  }
+
+  function commitOrdinaryTax() {
+    const val = parseFloat(ordinaryTaxDraft) / 100
+    if (!isNaN(val)) updateRetirementPlan({ ordinaryIncomeTaxRate: Math.max(0, val) })
+    setEditingOrdinaryTax(false)
+  }
+
+  function commitCapGainsTax() {
+    const val = parseFloat(capGainsTaxDraft) / 100
+    if (!isNaN(val)) updateRetirementPlan({ capitalGainsTaxRate: Math.max(0, val) })
+    setEditingCapGainsTax(false)
   }
 
   return (
@@ -221,6 +271,60 @@ export function RetirementTab() {
               className="text-sm text-slate-300 hover:text-blue-300 tabular-nums transition-colors"
             >
               {((plan.portfolioReturnRate ?? 0) * 100).toFixed(1)}%
+            </button>
+          )}
+        </div>
+        <div className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-700/30">
+          <div>
+            <span className="text-sm text-slate-200">Ordinary Income Tax Rate</span>
+            <span className="text-xs text-slate-500 ml-2">on Traditional IRA/401k/403b withdrawals</span>
+          </div>
+          {editingOrdinaryTax ? (
+            <div className="flex items-center gap-1">
+              <input
+                autoFocus
+                className="bg-slate-700 text-white text-sm rounded px-2 py-1 border border-blue-500 outline-none w-20 text-right"
+                value={ordinaryTaxDraft}
+                onChange={e => setOrdinaryTaxDraft(e.target.value)}
+                onBlur={commitOrdinaryTax}
+                onKeyDown={e => { if (e.key === 'Enter') commitOrdinaryTax(); if (e.key === 'Escape') setEditingOrdinaryTax(false) }}
+              />
+              <span className="text-slate-400 text-sm">%</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => { setOrdinaryTaxDraft((ordinaryIncomeTaxRate * 100).toFixed(1)); setEditingOrdinaryTax(true) }}
+              className="text-sm text-slate-300 hover:text-blue-300 tabular-nums transition-colors"
+            >
+              {(ordinaryIncomeTaxRate * 100).toFixed(1)}%
+            </button>
+          )}
+        </div>
+        <div className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-700/30">
+          <div>
+            <span className="text-sm text-slate-200">Capital Gains Tax Rate</span>
+            <span className="text-xs text-slate-500 ml-2">on brokerage withdrawals</span>
+          </div>
+          {editingCapGainsTax ? (
+            <div className="flex items-center gap-1">
+              <input
+                autoFocus
+                className="bg-slate-700 text-white text-sm rounded px-2 py-1 border border-blue-500 outline-none w-20 text-right"
+                value={capGainsTaxDraft}
+                onChange={e => setCapGainsTaxDraft(e.target.value)}
+                onBlur={commitCapGainsTax}
+                onKeyDown={e => { if (e.key === 'Enter') commitCapGainsTax(); if (e.key === 'Escape') setEditingCapGainsTax(false) }}
+              />
+              <span className="text-slate-400 text-sm">%</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => { setCapGainsTaxDraft((capitalGainsTaxRate * 100).toFixed(1)); setEditingCapGainsTax(true) }}
+              className="text-sm text-slate-300 hover:text-blue-300 tabular-nums transition-colors"
+            >
+              {(capitalGainsTaxRate * 100).toFixed(1)}%
             </button>
           )}
         </div>
@@ -329,6 +433,14 @@ export function RetirementTab() {
               <div className="text-xs text-slate-500 mb-0.5">Annual Net Draw</div>
               <div className="text-lg font-semibold text-slate-200 tabular-nums">{fmt(annualNetDraw)}</div>
             </div>
+            <div>
+              <div className="text-xs text-slate-500 mb-0.5">Effective Tax Rate</div>
+              <div className="text-lg font-semibold text-slate-200 tabular-nums">{(blendedTaxRate * 100).toFixed(1)}%</div>
+            </div>
+            <div>
+              <div className="text-xs text-slate-500 mb-0.5">Annual Draw (Pre-Tax)</div>
+              <div className="text-lg font-semibold text-slate-200 tabular-nums">{fmt(grossAnnualDraw)}</div>
+            </div>
           </div>
 
           <div className="border-t border-slate-600/50 pt-3">
@@ -345,9 +457,8 @@ export function RetirementTab() {
             <div>
               <div className="text-xs text-slate-500 mb-0.5">Funded Years of Retirement</div>
               <div className="text-xs text-slate-500">
-                {r > 0
-                  ? `${(r * 100).toFixed(1)}% annual return during drawdown`
-                  : 'No growth assumed'}
+                {r > 0 ? `${(r * 100).toFixed(1)}% return` : 'No growth assumed'}
+                {' · '}{(blendedTaxRate * 100).toFixed(1)}% blended tax on withdrawals
               </div>
             </div>
             <div className={`text-3xl font-bold tabular-nums ${fundedColor}`}>

@@ -1,3 +1,5 @@
+import type { AccountType, TaxTreatment } from '../types'
+
 export function computeFV(
   presentValue: number,
   annualRate: number,
@@ -44,3 +46,28 @@ export const ACCOUNT_CATEGORY_LABELS: Record<string, string> = {
 }
 
 export const CATEGORY_ORDER = ['emergency', 'retirement', 'college', 'investment', 'spending', 'kids', 'other'] as const
+
+export const TAX_TREATMENT_LABELS: Record<TaxTreatment, string> = {
+  tax_free: 'Tax-Free',
+  tax_deferred: 'Tax-Deferred',
+  taxable: 'Taxable',
+}
+
+// Roth/HSA withdrawals are tax-free (already-taxed or qualified-medical); traditional
+// retirement accounts are taxed as ordinary income on withdrawal; brokerage gains are
+// taxed at capital-gains rates. Cash accounts are treated as already-taxed.
+export function defaultTaxTreatment(accountType: AccountType): TaxTreatment {
+  switch (accountType) {
+    case 'roth_ira':
+    case 'hsa':
+      return 'tax_free'
+    case 'traditional_ira':
+    case '401k':
+    case '403b':
+      return 'tax_deferred'
+    case 'brokerage':
+      return 'taxable'
+    default:
+      return 'tax_free'
+  }
+}
