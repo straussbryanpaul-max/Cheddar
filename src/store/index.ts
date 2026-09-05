@@ -344,11 +344,20 @@ export const useStore = create<State>()(
         })),
 
       setPaySettings: (s) => {
-        set(state => ({
-          defaultPayAmount: s.defaultPayAmount ?? state.defaultPayAmount,
-          payFrequency: s.payFrequency ?? state.payFrequency,
-          payAnchorDate: s.payAnchorDate ?? state.payAnchorDate,
-        }))
+        set(state => {
+          const newDefault = s.defaultPayAmount ?? state.defaultPayAmount
+          const amountChanged = newDefault !== state.defaultPayAmount
+          return {
+            defaultPayAmount: newDefault,
+            payFrequency: s.payFrequency ?? state.payFrequency,
+            payAnchorDate: s.payAnchorDate ?? state.payAnchorDate,
+            periods: amountChanged
+              ? state.periods.map(p =>
+                  p.payAmount === state.defaultPayAmount ? { ...p, payAmount: newDefault } : p
+                )
+              : state.periods,
+          }
+        })
       },
 
       regeneratePeriods: () => {
