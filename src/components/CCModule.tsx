@@ -541,18 +541,19 @@ export function CCModule() {
           ? ccAnalyses.find(a => a.id === ccProjectionBaseId) ?? sortedAnalyses[0]
           : sortedAnalyses[0]
         const todayDay = new Date().getDate()
+        const baseTxs = baseAnalysis
+          ? (personFilter === 'All' ? baseAnalysis.transactions : baseAnalysis.transactions.filter(tx => tx.person === personFilter))
+          : []
         // Only include recurring charges that typically post AFTER today (not yet in current balance)
-        const remainingRecurring = baseAnalysis
-          ? baseAnalysis.transactions.filter(tx => {
-              if (!tx.isRecurring) return false
-              const day = new Date(tx.date + 'T12:00:00').getDate()
-              return day > todayDay
-            })
-          : []
+        const remainingRecurring = baseTxs.filter(tx => {
+          if (!tx.isRecurring) return false
+          const day = new Date(tx.date + 'T12:00:00').getDate()
+          return day > todayDay
+        })
         const remainingRecurringTotal = remainingRecurring.reduce((s, tx) => s + tx.amount, 0)
-        const alreadyPostedRecurring = baseAnalysis
-          ? baseAnalysis.transactions.filter(tx => tx.isRecurring && new Date(tx.date + 'T12:00:00').getDate() <= todayDay)
-          : []
+        const alreadyPostedRecurring = baseTxs.filter(tx =>
+          tx.isRecurring && new Date(tx.date + 'T12:00:00').getDate() <= todayDay
+        )
         const projected = (ccCurrentBalance ?? 0) + remainingRecurringTotal
         return (
           <div className="bg-slate-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4">
