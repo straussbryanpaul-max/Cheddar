@@ -57,6 +57,7 @@ export function CCModule() {
 
   const sortedAnalyses = [...ccAnalyses].sort((a, b) => b.savedAt.localeCompare(a.savedAt) || b.id.localeCompare(a.id))
   const storedSelectedId = useStore(s => s.uiPrefs.ccSelectedId)
+  const ccCurrentBalance = useStore(s => s.uiPrefs.ccCurrentBalance)
   const recurringOpen = useStore(s => s.uiPrefs.ccRecurringOpen)
   const oneOffOpen = useStore(s => s.uiPrefs.ccOneOffOpen)
   const allTxOpen = useStore(s => s.uiPrefs.ccAllTxOpen)
@@ -93,6 +94,8 @@ export function CCModule() {
   const [view, setView] = useState<'results' | 'flagged'>('results')
   const [editingNoteTxId, setEditingNoteTxId] = useState<string | null>(null)
   const [noteDraft, setNoteDraft] = useState('')
+  const [editingBalance, setEditingBalance] = useState(false)
+  const [balanceDraft, setBalanceDraft] = useState('')
 
   const ccFileRef = useRef<HTMLInputElement>(null)
 
@@ -529,6 +532,65 @@ export function CCModule() {
           <div className="text-xs text-slate-600 mt-0.5">{oneOffTxs.length} items</div>
         </div>
       </div>
+
+      {/* Current Balance + Projected Statement Balance */}
+      {(() => {
+        const projected = (ccCurrentBalance ?? 0) + recurringTotal
+        return (
+          <div className="bg-slate-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex-1">
+              <div className="text-xs text-slate-500 uppercase tracking-widest mb-1">Current Balance</div>
+              {editingBalance ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500 text-sm">$</span>
+                  <input
+                    autoFocus
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="w-32 bg-slate-700 text-white text-lg font-bold rounded-lg px-2 py-1 border border-blue-500 outline-none tabular-nums"
+                    value={balanceDraft}
+                    onChange={e => setBalanceDraft(e.target.value)}
+                    onBlur={() => {
+                      const v = parseFloat(balanceDraft)
+                      setUiPrefs({ ccCurrentBalance: Number.isFinite(v) ? v : null })
+                      setEditingBalance(false)
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        const v = parseFloat(balanceDraft)
+                        setUiPrefs({ ccCurrentBalance: Number.isFinite(v) ? v : null })
+                        setEditingBalance(false)
+                      }
+                      if (e.key === 'Escape') setEditingBalance(false)
+                    }}
+                  />
+                </div>
+              ) : (
+                <button
+                  onClick={() => { setBalanceDraft(ccCurrentBalance != null ? String(ccCurrentBalance) : ''); setEditingBalance(true) }}
+                  className="text-xl font-bold text-white tabular-nums hover:text-blue-300 transition-colors text-left"
+                >
+                  {ccCurrentBalance != null ? fmt(ccCurrentBalance) : <span className="text-slate-600 text-base font-normal">Click to enter balance</span>}
+                </button>
+              )}
+              <div className="text-xs text-slate-600 mt-0.5">What's on the card so far this statement</div>
+            </div>
+            <div className="w-px bg-slate-700 hidden sm:block self-stretch" />
+            <div className="flex-1">
+              <div className="text-xs text-slate-500 uppercase tracking-widest mb-1">Projected Statement</div>
+              <div className={`text-xl font-bold tabular-nums ${ccCurrentBalance != null ? 'text-emerald-400' : 'text-slate-600'}`}>
+                {ccCurrentBalance != null ? fmt(projected) : '—'}
+              </div>
+              <div className="text-xs text-slate-600 mt-0.5">
+                {ccCurrentBalance != null
+                  ? `Current ${fmt(ccCurrentBalance)} + ${fmt(recurringTotal)} recurring`
+                  : 'Enter current balance to project'}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Two-column body: tables left (3fr), chart right (2fr) */}
       <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-5 items-start">

@@ -279,6 +279,7 @@ export interface UiPrefs {
   ccAllTxOpen: boolean
   ccExpandedCats: string[]
   ccSSListOpen: boolean
+  ccCurrentBalance: number | null
   collegeYearUi: Record<string, { collapsed: boolean; contribsOpen: boolean; expensesOpen: boolean }>
   wealthTab: WealthTab
   wealthAccountExpanded: Record<string, boolean>
