@@ -58,6 +58,7 @@ export function CCModule() {
   const sortedAnalyses = [...ccAnalyses].sort((a, b) => b.savedAt.localeCompare(a.savedAt) || b.id.localeCompare(a.id))
   const storedSelectedId = useStore(s => s.uiPrefs.ccSelectedId)
   const ccCurrentBalance = useStore(s => s.uiPrefs.ccCurrentBalance)
+  const ccProjectionBaseId = useStore(s => s.uiPrefs.ccProjectionBaseId)
   const recurringOpen = useStore(s => s.uiPrefs.ccRecurringOpen)
   const oneOffOpen = useStore(s => s.uiPrefs.ccOneOffOpen)
   const allTxOpen = useStore(s => s.uiPrefs.ccAllTxOpen)
@@ -535,7 +536,14 @@ export function CCModule() {
 
       {/* Current Balance + Projected Statement Balance */}
       {(() => {
-        const projected = (ccCurrentBalance ?? 0) + recurringTotal
+        // Determine which statement to use as the recurring baseline
+        const baseAnalysis = ccProjectionBaseId
+          ? ccAnalyses.find(a => a.id === ccProjectionBaseId) ?? sortedAnalyses[0]
+          : sortedAnalyses[0]
+        const baseRecurringTotal = baseAnalysis
+          ? baseAnalysis.transactions.filter(tx => tx.isRecurring).reduce((s, tx) => s + tx.amount, 0)
+          : 0
+        const projected = (ccCurrentBalance ?? 0) + baseRecurringTotal
         return (
           <div className="bg-slate-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4">
             <div className="flex-1">
@@ -578,13 +586,27 @@ export function CCModule() {
             </div>
             <div className="w-px bg-slate-700 hidden sm:block self-stretch" />
             <div className="flex-1">
-              <div className="text-xs text-slate-500 uppercase tracking-widest mb-1">Projected Statement</div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="text-xs text-slate-500 uppercase tracking-widest">Projected Statement</div>
+                {sortedAnalyses.length > 1 && (
+                  <select
+                    className="ml-auto bg-slate-700 text-slate-300 text-xs rounded px-2 py-0.5 border border-slate-600/50 outline-none focus:border-blue-500"
+                    value={ccProjectionBaseId ?? sortedAnalyses[0]?.id ?? ''}
+                    onChange={e => setUiPrefs({ ccProjectionBaseId: e.target.value })}
+                    title="Base recurring charges on this statement"
+                  >
+                    {sortedAnalyses.map(a => (
+                      <option key={a.id} value={a.id}>{a.month}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
               <div className={`text-xl font-bold tabular-nums ${ccCurrentBalance != null ? 'text-emerald-400' : 'text-slate-600'}`}>
                 {ccCurrentBalance != null ? fmt(projected) : '—'}
               </div>
               <div className="text-xs text-slate-600 mt-0.5">
                 {ccCurrentBalance != null
-                  ? `Current ${fmt(ccCurrentBalance)} + ${fmt(recurringTotal)} recurring`
+                  ? `Current ${fmt(ccCurrentBalance)} + ${fmt(baseRecurringTotal)} recurring (${baseAnalysis?.month ?? ''})`
                   : 'Enter current balance to project'}
               </div>
             </div>

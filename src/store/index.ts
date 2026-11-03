@@ -277,6 +277,7 @@ export const useStore = create<State>()(
         ccExpandedCats: [],
         ccSSListOpen: true,
         ccCurrentBalance: null,
+        ccProjectionBaseId: null,
         collegeYearUi: {},
         wealthTab: 'accounts',
         wealthAccountExpanded: {},
