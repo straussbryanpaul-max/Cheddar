@@ -540,10 +540,20 @@ export function CCModule() {
         const baseAnalysis = ccProjectionBaseId
           ? ccAnalyses.find(a => a.id === ccProjectionBaseId) ?? sortedAnalyses[0]
           : sortedAnalyses[0]
-        const baseRecurringTotal = baseAnalysis
-          ? baseAnalysis.transactions.filter(tx => tx.isRecurring).reduce((s, tx) => s + tx.amount, 0)
-          : 0
-        const projected = (ccCurrentBalance ?? 0) + baseRecurringTotal
+        const todayDay = new Date().getDate()
+        // Only include recurring charges that typically post AFTER today (not yet in current balance)
+        const remainingRecurring = baseAnalysis
+          ? baseAnalysis.transactions.filter(tx => {
+              if (!tx.isRecurring) return false
+              const day = new Date(tx.date + 'T12:00:00').getDate()
+              return day > todayDay
+            })
+          : []
+        const remainingRecurringTotal = remainingRecurring.reduce((s, tx) => s + tx.amount, 0)
+        const alreadyPostedRecurring = baseAnalysis
+          ? baseAnalysis.transactions.filter(tx => tx.isRecurring && new Date(tx.date + 'T12:00:00').getDate() <= todayDay)
+          : []
+        const projected = (ccCurrentBalance ?? 0) + remainingRecurringTotal
         return (
           <div className="bg-slate-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4">
             <div className="flex-1">
@@ -606,7 +616,7 @@ export function CCModule() {
               </div>
               <div className="text-xs text-slate-600 mt-0.5">
                 {ccCurrentBalance != null
-                  ? `Current ${fmt(ccCurrentBalance)} + ${fmt(baseRecurringTotal)} recurring (${baseAnalysis?.month ?? ''})`
+                  ? `Current ${fmt(ccCurrentBalance)} + ${fmt(remainingRecurringTotal)} still coming (${remainingRecurring.length} of ${(alreadyPostedRecurring.length + remainingRecurring.length)} recurring after day ${todayDay})`
                   : 'Enter current balance to project'}
               </div>
             </div>
