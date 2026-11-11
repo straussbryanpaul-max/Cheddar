@@ -34,6 +34,7 @@ export function BigPictureModule() {
   const deleteForecastItem = useStore(s => s.deleteForecastItem)
   const bigPictureNotes = useStore(s => s.bigPictureNotes)
   const addBigPictureNote = useStore(s => s.addBigPictureNote)
+  const updateBigPictureNote = useStore(s => s.updateBigPictureNote)
   const deleteBigPictureNote = useStore(s => s.deleteBigPictureNote)
 
   // ── Current period ────────────────────────────────────────────────────────
@@ -558,28 +559,55 @@ export function BigPictureModule() {
       </div>
 
       {/* Scratch pad */}
-      <ScratchPad notes={bigPictureNotes} onAdd={addBigPictureNote} onDelete={deleteBigPictureNote} />
+      <ScratchPad notes={bigPictureNotes} onAdd={addBigPictureNote} onUpdate={updateBigPictureNote} onDelete={deleteBigPictureNote} />
     </div>
   )
 }
 
 // ── Scratch pad ───────────────────────────────────────────────────────────────
 
-function ScratchPad({ notes, onAdd, onDelete }: { notes: string[]; onAdd: (t: string) => void; onDelete: (i: number) => void }) {
+function ScratchPad({ notes, onAdd, onUpdate, onDelete }: { notes: string[]; onAdd: (t: string) => void; onUpdate: (i: number, t: string) => void; onDelete: (i: number) => void }) {
   const [draft, setDraft] = React.useState('')
+  const [editingIdx, setEditingIdx] = React.useState<number | null>(null)
+  const [editDraft, setEditDraft] = React.useState('')
+
   function commit() {
     const t = draft.trim()
     if (t) { onAdd(t); setDraft('') }
   }
+  function startEdit(i: number) {
+    setEditingIdx(i)
+    setEditDraft(notes[i] ?? '')
+  }
+  function commitEdit(i: number) {
+    const t = editDraft.trim()
+    if (t) onUpdate(i, t); else onDelete(i)
+    setEditingIdx(null)
+  }
+
   return (
     <div className="bg-slate-800/40 border border-slate-700/30 rounded-xl p-4">
       <div className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-3">Don't Forget</div>
       {notes.length > 0 && (
         <ul className="space-y-1.5 mb-3">
           {notes.map((note, i) => (
-            <li key={i} className="flex items-start gap-2 group">
-              <span className="text-slate-500 mt-0.5 text-xs">•</span>
-              <span className="text-sm text-slate-200 flex-1">{note}</span>
+            <li key={i} className="flex items-start gap-2">
+              <span className="text-slate-500 mt-0.5 text-xs shrink-0">•</span>
+              {editingIdx === i ? (
+                <input
+                  autoFocus
+                  className="flex-1 bg-slate-700 border border-blue-500 rounded px-2 py-0.5 text-sm text-white outline-none"
+                  value={editDraft}
+                  onChange={e => setEditDraft(e.target.value)}
+                  onBlur={() => commitEdit(i)}
+                  onKeyDown={e => { if (e.key === 'Enter') commitEdit(i); if (e.key === 'Escape') setEditingIdx(null) }}
+                />
+              ) : (
+                <span
+                  className="text-sm text-slate-200 flex-1 cursor-pointer hover:text-white"
+                  onClick={() => startEdit(i)}
+                >{note}</span>
+              )}
               <button
                 onClick={() => onDelete(i)}
                 className="text-slate-600 hover:text-red-400 transition-colors text-xs shrink-0 mt-0.5"

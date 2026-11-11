@@ -130,6 +130,7 @@ interface State {
   // Big Picture scratch notes
   bigPictureNotes: string[]
   addBigPictureNote: (text: string) => void
+  updateBigPictureNote: (index: number, text: string) => void
   deleteBigPictureNote: (index: number) => void
 
   // UI preferences (persistent across sessions, synced via Supabase)
@@ -833,6 +834,8 @@ export const useStore = create<State>()(
 
       addBigPictureNote: (text) =>
         set(s => ({ bigPictureNotes: [...s.bigPictureNotes, text] })),
+      updateBigPictureNote: (index, text) =>
+        set(s => ({ bigPictureNotes: s.bigPictureNotes.map((n, i) => i === index ? text : n) })),
       deleteBigPictureNote: (index) =>
         set(s => ({ bigPictureNotes: s.bigPictureNotes.filter((_, i) => i !== index) })),
 
