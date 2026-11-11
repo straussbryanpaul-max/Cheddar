@@ -104,6 +104,7 @@ export function BigPictureModule() {
     ? ccCurrentBalance + remainingRecurringTotal
     : null
   const [ccStillOutOpen, setCCStillOutOpen] = useState(false)
+  const [specOpen, setSpecOpen] = useState(false)
 
   // ── Spec accounts ─────────────────────────────────────────────────────────
   const specAccounts = wealthAccounts.filter(a =>
@@ -314,7 +315,7 @@ export function BigPictureModule() {
           )}
           {checkingPeriodRows.map((row, i) => (
             <TileRow key={i} label={row.label}>
-              <span className={row.end >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmt(row.end)}</span>
+              <span className="text-slate-300">{fmt(row.end)}</span>
             </TileRow>
           ))}
           {stillOutItems.length > 0 && (
@@ -346,7 +347,7 @@ export function BigPictureModule() {
           )}
           {ccMonthRows.map((row, i) => (
             <TileRow key={i} label={row.label}>
-              <span className="text-amber-400">{fmt(row.end)}</span>
+              <span className="text-slate-300">{fmt(row.end)}</span>
             </TileRow>
           ))}
           {remainingRecurring.length > 0 && ccCurrentBalance !== null && (
@@ -366,12 +367,19 @@ export function BigPictureModule() {
           <TileBigNum>{fmt(specTotal)}</TileBigNum>
           {specEndForecast !== null && specEndForecast !== specTotal && (
             <TileRow label="Forecast">
-              <span className={specEndForecast >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmt(specEndForecast)}</span>
+              <span className="text-slate-300">{fmt(specEndForecast)}</span>
             </TileRow>
           )}
-          {specAccounts.map(a => (
-            <TileRow key={a.id} label={a.name}><span className="text-slate-500">{fmt(a.balance)}</span></TileRow>
-          ))}
+          {specAccounts.length > 0 && (
+            <TileCollapsible
+              open={specOpen} onToggle={() => setSpecOpen(o => !o)}
+              summary={<span className="text-slate-500">{specAccounts.length} account{specAccounts.length !== 1 ? 's' : ''}</span>}
+            >
+              {specAccounts.map(a => (
+                <TileRow key={a.id} label={a.name}><span className="text-slate-500">{fmt(a.balance)}</span></TileRow>
+              ))}
+            </TileCollapsible>
+          )}
         </Tile>
 
         {/* HSA */}
@@ -380,7 +388,7 @@ export function BigPictureModule() {
             <TileBigNum>{fmt(hsaTotal)}</TileBigNum>
             {hsaEndForecast !== null && hsaEndForecast !== hsaTotal && (
               <TileRow label="Forecast">
-                <span className={hsaEndForecast >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmt(hsaEndForecast)}</span>
+                <span className="text-slate-300">{fmt(hsaEndForecast)}</span>
               </TileRow>
             )}
             <TileRow label={hsaAccounts.length > 1 ? `${hsaAccounts.length} accounts` : (hsaAccounts[0]?.institution ?? '')}><span /></TileRow>
@@ -406,7 +414,7 @@ export function BigPictureModule() {
           )}
           {boaAccount && boaEndForecast !== null && boaEndForecast !== boaAccount.balance && (
             <TileRow label="Forecast">
-              <span className={boaEndForecast >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmt(boaEndForecast)}</span>
+              <span className="text-slate-300">{fmt(boaEndForecast)}</span>
             </TileRow>
           )}
           {boaAccount && <TileRow label={boaAccount.name}><span /></TileRow>}
