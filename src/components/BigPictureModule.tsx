@@ -107,6 +107,7 @@ export function BigPictureModule() {
   const ccProjectedFinal = ccCurrentBalance !== null
     ? ccCurrentBalance + remainingRecurringTotal
     : null
+  const [selectedPeriodIdx, setSelectedPeriodIdx] = useState(0)
   const [ccStillOutOpen, setCCStillOutOpen] = useState(false)
   const [specOpen, setSpecOpen] = useState(false)
   const [hsaOpen, setHsaOpen] = useState(false)
@@ -320,11 +321,27 @@ export function BigPictureModule() {
               {checkingBalance !== null ? fmt(checkingBalance) : null}
             </TileBigNum>
           )}
-          {checkingPeriodRows.map((row, i) => (
-            <TileRow key={i} label={row.label}>
-              <span className="text-sm font-semibold text-slate-100">{fmt(row.end)}</span>
-            </TileRow>
-          ))}
+          {checkingPeriodRows.length > 0 && (() => {
+            const safeIdx = Math.min(selectedPeriodIdx, checkingPeriodRows.length - 1)
+            const row = checkingPeriodRows[safeIdx]!
+            return (
+              <TileRow label={
+                checkingPeriodRows.length > 1
+                  ? <select
+                      className="bg-transparent text-slate-500 text-xs outline-none cursor-pointer"
+                      value={safeIdx}
+                      onChange={e => setSelectedPeriodIdx(Number(e.target.value))}
+                    >
+                      {checkingPeriodRows.map((r, i) => (
+                        <option key={i} value={i}>{r.label}</option>
+                      ))}
+                    </select>
+                  : row.label
+              }>
+                <span className="text-sm font-semibold text-slate-100">{fmt(row.end)}</span>
+              </TileRow>
+            )
+          })()}
           {stillOutItems.length > 0 && (
             <TileCollapsible
               open={stillOutOpen} onToggle={() => setStillOutOpen(o => !o)}
@@ -655,7 +672,7 @@ function TileBigNum({ children, onEdit }: { children: React.ReactNode; onEdit?: 
   return <div className="text-2xl font-bold text-white leading-tight">{children}</div>
 }
 
-function TileRow({ label, children }: { label: string; children: React.ReactNode }) {
+function TileRow({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between text-xs">
       <span className="text-slate-500 truncate pr-2">{label}</span>
