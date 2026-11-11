@@ -149,7 +149,7 @@ export function BigPictureModule() {
 
   // Build account options for the forecast item selector
   const savingsAccounts = wealthAccounts.filter(a =>
-    ['checking', 'savings', 'money_market', 'cd'].includes(a.type)
+    ['checking', 'savings', 'money_market', 'cd', 'hsa'].includes(a.type)
   )
   const accountOptions: { id: string; label: string }[] = [
     { id: 'checking', label: 'Checking' },
