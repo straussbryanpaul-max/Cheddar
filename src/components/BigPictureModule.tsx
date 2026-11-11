@@ -105,6 +105,7 @@ export function BigPictureModule() {
     : null
   const [ccStillOutOpen, setCCStillOutOpen] = useState(false)
   const [specOpen, setSpecOpen] = useState(false)
+  const [hsaOpen, setHsaOpen] = useState(false)
   const [forecastOpen, setForecastOpen] = useState(true)
   const [openAccts, setOpenAccts] = useState<Record<string, boolean>>({})
 
@@ -393,7 +394,18 @@ export function BigPictureModule() {
                 <span className="text-sm font-semibold text-slate-100">{fmt(hsaEndForecast)}</span>
               </TileRow>
             )}
-            <TileRow label={hsaAccounts.length > 1 ? `${hsaAccounts.length} accounts` : (hsaAccounts[0]?.institution ?? '')}><span /></TileRow>
+            {hsaAccounts.length > 1 ? (
+              <TileCollapsible
+                open={hsaOpen} onToggle={() => setHsaOpen(o => !o)}
+                summary={<span className="text-slate-500">{hsaAccounts.length} accounts</span>}
+              >
+                {hsaAccounts.map(a => (
+                  <TileRow key={a.id} label={a.name}><span className="text-slate-500">{fmt(a.balance)}</span></TileRow>
+                ))}
+              </TileCollapsible>
+            ) : (
+              <div className="text-xs text-slate-600 pt-0.5">{hsaAccounts[0]?.institution ?? ''}</div>
+            )}
           </Tile>
         )}
 
