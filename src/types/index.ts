@@ -270,10 +270,13 @@ export interface CollegeForecastYear {
 
 export type AppModule = 'budget' | 'savings' | 'college' | 'bills' | 'cc' | 'big-picture' | 'bonus-calc'
 
+export type BonusCalcCategory = 'spending' | 'investments' | 'savings' | 'giving' | 'home' | 'travel' | 'other'
+
 export interface BonusCalcBucket {
   id: string
   label: string
   amount: string
+  category: BonusCalcCategory
 }
 
 export interface BonusCalcDraft {

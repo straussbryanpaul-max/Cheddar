@@ -288,9 +288,9 @@ export const useStore = create<State>()(
       forecastItems: [],
       bonusCalc: {
         draft: { gross: '', federalRate: '22', stateRate: '5', ssYtd: '', k401Rate: '6', buckets: [
-          { id: '1', label: 'Spending / fun', amount: '' },
-          { id: '2', label: 'Investments', amount: '' },
-          { id: '3', label: 'Emergency fund', amount: '' },
+          { id: '1', label: 'Spending / fun', amount: '', category: 'spending' },
+          { id: '2', label: 'Investments', amount: '', category: 'investments' },
+          { id: '3', label: 'Emergency fund', amount: '', category: 'savings' },
         ]},
         snapshots: [],
       },
