@@ -179,6 +179,22 @@ export function CCModule() {
       const result = await analyzeMidPeriod(statementFile, key, ccMerchantMemory)
       saveCCAnalysis(result)
       setSelectedId(result.id)
+
+      // Auto-run S&S match, same as full statement
+      if (amazonSSItems.length > 0) {
+        const candidates = result.transactions
+          .filter(tx => tx.category === 'Amazon' && (tx.person === 'Rachel' || tx.person == null))
+          .map(tx => ({ id: tx.id, date: tx.date, amount: tx.amount }))
+        if (candidates.length > 0) {
+          try {
+            const matched = await matchAmazonSubscribeSave(amazonSSItems, candidates, result.statementRange, key)
+            applyAmazonSSMatch(result.id, matched)
+          } catch (e) {
+            console.error('Auto S&S match failed', e)
+          }
+        }
+      }
+
       setStep('results')
       setStatementFile(null); setStatementFileName('')
     } catch (err) {
