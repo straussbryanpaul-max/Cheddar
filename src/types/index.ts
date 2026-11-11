@@ -268,7 +268,7 @@ export interface CollegeForecastYear {
   closedOut: boolean
 }
 
-export type AppModule = 'budget' | 'savings' | 'college' | 'bills' | 'cc' | 'big-picture'
+export type AppModule = 'budget' | 'savings' | 'college' | 'bills' | 'cc' | 'big-picture' | 'bonus-calc'
 
 export interface ForecastItem {
   id: string
