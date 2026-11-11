@@ -110,6 +110,10 @@ export function BigPictureModule() {
   )
   const specTotal = specAccounts.reduce((s, a) => s + a.balance, 0)
 
+  // ── HSA accounts ─────────────────────────────────────────────────────────
+  const hsaAccounts = wealthAccounts.filter(a => a.type === 'hsa')
+  const hsaTotal = hsaAccounts.reduce((s, a) => s + a.balance, 0)
+
   // ── BOA savings ──────────────────────────────────────────────────────────
   const boaAccount = wealthAccounts.find(a =>
     a.institution.toLowerCase().includes('boa') ||
@@ -194,7 +198,7 @@ export function BigPictureModule() {
       </div>
 
       {/* Top tiles */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
 
         {/* Checking */}
         <div className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-4 space-y-1">
@@ -308,6 +312,19 @@ export function BigPictureModule() {
           <div className="text-2xl font-bold text-white">{fmt(specTotal)}</div>
           <div className="text-xs text-slate-500">{specAccounts.length} account{specAccounts.length !== 1 ? 's' : ''}</div>
         </div>
+
+        {/* HSA */}
+        {hsaAccounts.length > 0 && (
+          <div className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-4 space-y-1">
+            <div className="text-xs text-slate-400 font-medium uppercase tracking-wide">HSA</div>
+            <div className="text-2xl font-bold text-white">{fmt(hsaTotal)}</div>
+            <div className="text-xs text-slate-500">
+              {hsaAccounts.length > 1
+                ? `${hsaAccounts.length} accounts`
+                : hsaAccounts[0]?.institution}
+            </div>
+          </div>
+        )}
 
         {/* BOA Savings */}
         <div className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-4 space-y-1">
