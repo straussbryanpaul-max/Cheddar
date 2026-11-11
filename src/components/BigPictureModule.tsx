@@ -197,7 +197,12 @@ export function BigPictureModule() {
         ? (p.openingBalance ?? allProjectedOpenings.get(p.id) ?? null)
         : (prevEnd !== null ? prevEnd + p.payAmount : null)
       if (opening === null) break
-      const baseForecast = calcForecast({ ...p, openingBalance: opening }, periodItems, bills, extras)
+      const baseForecast = calcForecast(
+        { ...p, openingBalance: opening },
+        periodItems.filter(i => i.periodId === p.id),
+        bills,
+        extras.filter(e => e.periodId === p.id),
+      )
       if (baseForecast === null) break
       const end = baseForecast + (checkingByPeriod.get(p.id) ?? 0)
       if (affectedCheckingIds.has(p.id)) {
