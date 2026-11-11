@@ -105,6 +105,8 @@ export function BigPictureModule() {
     : null
   const [ccStillOutOpen, setCCStillOutOpen] = useState(false)
   const [specOpen, setSpecOpen] = useState(false)
+  const [forecastOpen, setForecastOpen] = useState(true)
+  const [openAccts, setOpenAccts] = useState<Record<string, boolean>>({})
 
   // ── Spec accounts ─────────────────────────────────────────────────────────
   const specAccounts = wealthAccounts.filter(a =>
@@ -424,7 +426,16 @@ export function BigPictureModule() {
       {/* Forecast items */}
       <div className="bg-slate-800/40 border border-slate-700/30 rounded-xl p-4">
         <div className="flex items-center justify-between mb-3">
-          <div className="text-xs text-slate-400 font-medium uppercase tracking-wide">Forecast Transactions</div>
+          <button
+            onClick={() => setForecastOpen(o => !o)}
+            className="flex items-center gap-1.5 text-xs text-slate-400 font-medium uppercase tracking-wide hover:text-slate-200 transition-colors"
+          >
+            <svg className={`w-3 h-3 transition-transform ${forecastOpen ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+            Forecast Transactions
+            {forecastItems.length > 0 && <span className="text-slate-600 normal-case font-normal tracking-normal">({forecastItems.length})</span>}
+          </button>
           <button
             onClick={() => setAddingItem(true)}
             className="text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
@@ -436,35 +447,50 @@ export function BigPictureModule() {
           </button>
         </div>
 
-        {forecastItems.length === 0 && !addingItem ? (
-          <div className="text-sm text-slate-600 text-center py-4">No forecast items yet — add expected deposits or expenses.</div>
+        {forecastOpen && (forecastItems.length === 0 && !addingItem ? (
+          <div className="text-sm text-slate-600 text-center py-3">No forecast items yet — add expected deposits or expenses.</div>
         ) : (
-          <div className="space-y-6">
-            {acctGrouped.map(([acctId, items]) => (
-              <div key={acctId}>
-                <div className="text-xs text-slate-500 font-medium mb-2">{accountLabel(acctId)}</div>
-                <div className="space-y-1">
-                  {items.map(item => (
-                    <ForecastRow
-                      key={item.id}
-                      item={item}
-                      onUpdate={(updates) => updateForecastItem(item.id, updates)}
-                      onDelete={() => deleteForecastItem(item.id)}
-                      accountOptions={accountOptions}
-                    />
-                  ))}
-                  {/* Final running balance for this account */}
-                  <div className="flex justify-end pt-1 border-t border-slate-700/40">
-                    <span className="text-xs text-slate-500 mr-2">Balance after:</span>
-                    <span className={`text-xs font-semibold ${items[items.length - 1]!.runningBalance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {fmtExact(items[items.length - 1]!.runningBalance)}
-                    </span>
-                  </div>
+          <div className="space-y-3">
+            {acctGrouped.map(([acctId, items]) => {
+              const isOpen = openAccts[acctId] !== false // default open
+              const lastBalance = items[items.length - 1]!.runningBalance
+              return (
+                <div key={acctId}>
+                  <button
+                    onClick={() => setOpenAccts(s => ({ ...s, [acctId]: !isOpen }))}
+                    className="flex items-center gap-1.5 w-full text-left mb-1"
+                  >
+                    <svg className={`w-2.5 h-2.5 text-slate-500 transition-transform ${isOpen ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                    <span className="text-xs text-slate-400 font-medium">{accountLabel(acctId)}</span>
+                    <span className="text-xs text-slate-600 ml-1">({items.length})</span>
+                    {!isOpen && (
+                      <span className="ml-auto text-xs text-slate-400">{fmtExact(lastBalance)}</span>
+                    )}
+                  </button>
+                  {isOpen && (
+                    <div className="space-y-1 pl-4">
+                      {items.map(item => (
+                        <ForecastRow
+                          key={item.id}
+                          item={item}
+                          onUpdate={(updates) => updateForecastItem(item.id, updates)}
+                          onDelete={() => deleteForecastItem(item.id)}
+                          accountOptions={accountOptions}
+                        />
+                      ))}
+                      <div className="flex justify-end pt-1 border-t border-slate-700/40">
+                        <span className="text-xs text-slate-500 mr-2">Balance after:</span>
+                        <span className="text-xs font-semibold text-slate-300">{fmtExact(lastBalance)}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
-        )}
+        ))}
 
         {addingItem && (
           <div className="mt-3 bg-slate-700/40 rounded-lg p-3 space-y-2">
