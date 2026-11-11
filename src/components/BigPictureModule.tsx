@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../store'
-import { calcForecast } from '../lib/periods'
+import { calcForecast, periodEndDate, formatDate, buildProjectedOpenings } from '../lib/periods'
 import type { ForecastItem } from '../types'
 
 function fmt(n: number) {
@@ -18,6 +18,7 @@ function AmountColor({ amount }: { amount: number }) {
 
 export function BigPictureModule() {
   const periods = useStore(s => s.periods)
+  const payFrequency = useStore(s => s.payFrequency)
   const periodItems = useStore(s => s.periodItems)
   const bills = useStore(s => s.bills)
   const extras = useStore(s => s.extras)
@@ -164,19 +165,87 @@ export function BigPictureModule() {
     return a ? `${a.institution} – ${a.name}` : id
   }
 
-  // ── Forecast item totals per account (for tile end-state) ────────────────
+  // ── Period-aware checking forecast rows ───────────────────────────────────
+  // Group checking forecast items by pay period
+  const checkingByPeriod = new Map<string, number>()
+  for (const fi of forecastItems) {
+    if (fi.accountId !== 'checking') continue
+    const idx = periods.findIndex((p, i) => {
+      const nextStart = periods[i + 1]?.startDate ?? '9999-12-31'
+      return fi.date >= p.startDate && fi.date < nextStart
+    })
+    if (idx >= 0) {
+      const pid = periods[idx].id
+      checkingByPeriod.set(pid, (checkingByPeriod.get(pid) ?? 0) + fi.amount)
+    }
+  }
+
+  interface PeriodRow { label: string; end: number; isCurrent: boolean }
+  const checkingPeriodRows: PeriodRow[] = []
+
+  if (currentPeriod) {
+    const currentPeriodIdx = periods.findIndex(p => p.id === currentPeriod.id)
+    const affectedCheckingIds = new Set([currentPeriod.id, ...Array.from(checkingByPeriod.keys())])
+    const lastIdx = periods.reduce((max, p, i) =>
+      affectedCheckingIds.has(p.id) && i >= currentPeriodIdx ? Math.max(max, i) : max, currentPeriodIdx)
+    const allProjectedOpenings = buildProjectedOpenings(periods, periodItems, extras, bills)
+
+    let prevEnd: number | null = null
+    for (let i = currentPeriodIdx; i <= lastIdx; i++) {
+      const p = periods[i]
+      const opening = i === currentPeriodIdx
+        ? (p.openingBalance ?? allProjectedOpenings.get(p.id) ?? null)
+        : (prevEnd !== null ? prevEnd + p.payAmount : null)
+      if (opening === null) break
+      const baseForecast = calcForecast({ ...p, openingBalance: opening }, periodItems, bills, extras)
+      if (baseForecast === null) break
+      const end = baseForecast + (checkingByPeriod.get(p.id) ?? 0)
+      if (affectedCheckingIds.has(p.id)) {
+        checkingPeriodRows.push({
+          label: `${formatDate(p.startDate)} – ${formatDate(periodEndDate(p.startDate, payFrequency))}`,
+          end,
+          isCurrent: p.id === currentPeriod.id,
+        })
+      }
+      prevEnd = end
+    }
+  }
+
+  // ── Month-aware CC forecast rows ──────────────────────────────────────────
+  const ccByMonth = new Map<string, number>()
+  for (const fi of forecastItems) {
+    if (fi.accountId !== 'cc') continue
+    const month = fi.date.slice(0, 7)
+    ccByMonth.set(month, (ccByMonth.get(month) ?? 0) + fi.amount)
+  }
+
+  interface MonthRow { label: string; end: number; isCurrent: boolean }
+  const ccMonthRows: MonthRow[] = []
+
+  if (ccCurrentBalance !== null) {
+    const currentMonth = today.slice(0, 7)
+    const allMonths = new Set([currentMonth, ...Array.from(ccByMonth.keys())])
+    const sortedMonths = [...allMonths].filter(m => m >= currentMonth).sort()
+    let running = ccCurrentBalance
+    for (const month of sortedMonths) {
+      const isCurrentMonth = month === currentMonth
+      if (isCurrentMonth) {
+        running = (ccProjectedFinal ?? ccCurrentBalance) + (ccByMonth.get(month) ?? 0)
+      } else {
+        running = running + (ccByMonth.get(month) ?? 0)
+      }
+      const [y, m] = month.split('-')
+      const label = new Date(parseInt(y!), parseInt(m!) - 1, 1)
+        .toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+      ccMonthRows.push({ label, end: running, isCurrent: isCurrentMonth })
+    }
+  }
+
+  // ── Simple totals for Spec / HSA / BOA (no period structure) ─────────────
   const forecastTotals: Record<string, number> = {}
   for (const fi of forecastItems) {
     forecastTotals[fi.accountId] = (forecastTotals[fi.accountId] ?? 0) + fi.amount
   }
-
-  // End-state forecasts for each tile
-  const checkingEndForecast = periodForecast !== null
-    ? periodForecast + (forecastTotals['checking'] ?? 0)
-    : null
-  const ccEndForecast = ccProjectedFinal !== null
-    ? ccProjectedFinal + (forecastTotals['cc'] ?? 0)
-    : null
   const boaEndForecast = boaAccount
     ? boaAccount.balance + (forecastTotals[boaAccount.id] ?? 0)
     : null
@@ -243,16 +312,16 @@ export function BigPictureModule() {
               {checkingBalance !== null ? fmt(checkingBalance) : <span className="text-slate-500 text-base">tap to set</span>}
             </button>
           )}
-          <div className="text-xs text-slate-500">
-            Forecast:{' '}
-            {checkingEndForecast !== null
-              ? <span className={checkingEndForecast >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmt(checkingEndForecast)}</span>
-              : <span className="text-slate-600">—</span>
-            }
-            {forecastTotals['checking'] && periodForecast !== null && (
-              <span className="text-slate-600 ml-1">(period {fmt(periodForecast)})</span>
-            )}
-          </div>
+          {checkingPeriodRows.length > 0 && (
+            <div className="pt-1 space-y-0.5">
+              {checkingPeriodRows.map((row, i) => (
+                <div key={i} className="flex items-center justify-between text-xs">
+                  <span className="text-slate-500">{row.label}</span>
+                  <span className={row.end >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmt(row.end)}</span>
+                </div>
+              ))}
+            </div>
+          )}
           {stillOutItems.length > 0 && (
             <div className="pt-1">
               <button
@@ -299,16 +368,16 @@ export function BigPictureModule() {
               {ccCurrentBalance !== null ? fmt(ccCurrentBalance) : <span className="text-slate-500 text-base">tap to set</span>}
             </button>
           )}
-          <div className="text-xs text-slate-500">
-            Forecast:{' '}
-            {ccEndForecast !== null
-              ? <span className="text-amber-400">{fmt(ccEndForecast)}</span>
-              : <span className="text-slate-600">—</span>
-            }
-            {forecastTotals['cc'] && ccProjectedFinal !== null && (
-              <span className="text-slate-600 ml-1">(period {fmt(ccProjectedFinal)})</span>
-            )}
-          </div>
+          {ccMonthRows.length > 0 && (
+            <div className="pt-1 space-y-0.5">
+              {ccMonthRows.map((row, i) => (
+                <div key={i} className="flex items-center justify-between text-xs">
+                  <span className="text-slate-500">{row.label}</span>
+                  <span className="text-amber-400">{fmt(row.end)}</span>
+                </div>
+              ))}
+            </div>
+          )}
           {remainingRecurring.length > 0 && ccCurrentBalance !== null && (
             <div className="pt-1">
               <button
