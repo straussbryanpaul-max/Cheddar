@@ -4,7 +4,6 @@ import { useAuth } from '../lib/auth'
 import { analyzeCreditCard, analyzeMidPeriod, matchAmazonSubscribeSave, type StatementFile } from '../lib/analyzeCreditCard'
 import { useFormatCurrency } from '../lib/useFormatCurrency'
 import { CCCharts } from './CCCharts'
-import { MidPeriodView } from './MidPeriodView'
 import type { CCMonthlyAnalysis, CCTransaction, AmazonSubscribeItem } from '../types'
 
 const CC_CATEGORIES = [
@@ -467,31 +466,12 @@ export function CCModule() {
           <button
             key={a.id}
             onClick={() => setSelectedId(a.id)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${a.id === selectedId ? (a.type === 'mid-period' ? 'bg-violet-700 text-white' : 'bg-blue-600 text-white') : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'}`}
-          >{a.month}{a.type === 'mid-period' ? ' (mid)' : ''}</button>
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${a.id === selectedId ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'}`}
+          >{a.month}</button>
         ))}
       </div>
 
-      {/* Mid-period view — renders instead of normal results */}
-      {analysis.type === 'mid-period' && (() => {
-        const baseAnalysis = (() => {
-          const statementOptions = sortedAnalyses.filter(a => a.type !== 'mid-period')
-          return ccProjectionBaseId
-            ? statementOptions.find(a => a.id === ccProjectionBaseId) ?? statementOptions[0] ?? null
-            : statementOptions[0] ?? null
-        })()
-        return (
-          <MidPeriodView
-            midPeriod={analysis}
-            baseAnalysis={baseAnalysis}
-            sortedAnalyses={sortedAnalyses}
-            personFilter={personFilter}
-            projectionBaseId={ccProjectionBaseId}
-            onChangeProjectionBase={id => setUiPrefs({ ccProjectionBaseId: id })}
-          />
-        )
-      })()}
-      {analysis.type === 'mid-period' ? null : <>
+      {<>
 
       {/* Person filter + Flagged toggle */}
       <div className="flex items-center justify-between gap-2">
@@ -1020,7 +1000,7 @@ export function CCModule() {
 
       </div>{/* end two-column grid */}
       </>}{/* end results view */}
-      </>}{/* end non-mid-period block */}
+      </>}
     </div>
   )
 }
