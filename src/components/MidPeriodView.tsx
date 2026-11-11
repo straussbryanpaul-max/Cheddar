@@ -79,6 +79,19 @@ export function MidPeriodView({
   const [openRecurring, setOpenRecurring] = useState(true)
   const [openOneOff, setOpenOneOff] = useState(true)
   const [openExpected, setOpenExpected] = useState(true)
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set())
+  const [manualItems, setManualItems] = useState<{ id: string; description: string; amount: number }[]>([])
+  const [addingManual, setAddingManual] = useState(false)
+  const [manualDesc, setManualDesc] = useState('')
+  const [manualAmt, setManualAmt] = useState('')
+  const dismiss = (id: string) => setDismissedIds(prev => new Set([...prev, id]))
+  function commitManual() {
+    const desc = manualDesc.trim()
+    const amt = parseFloat(manualAmt)
+    if (!desc || !Number.isFinite(amt) || amt <= 0) return
+    setManualItems(prev => [...prev, { id: `manual-${Date.now()}`, description: desc, amount: amt }])
+    setManualDesc(''); setManualAmt(''); setAddingManual(false)
+  }
 
   const filteredTxs = personFilter === 'All'
     ? midPeriod.transactions
@@ -98,9 +111,12 @@ export function MidPeriodView({
     : []
 
   // Recurring items from base statement not yet covered mid-period
-  // "Covered" = description match OR same category already has a recurring charge mid-period
-  const stillExpectedRecurring = baseRecurring.filter(baseTx => !isCovered(baseTx, recurringTxs, filteredTxs))
+  // "Covered" = dismissed, description match, OR same category already has a recurring charge mid-period
+  const stillExpectedRecurring = baseRecurring.filter(baseTx =>
+    !dismissedIds.has(baseTx.id) && !isCovered(baseTx, recurringTxs, filteredTxs)
+  )
   const stillExpectedRecurringTotal = stillExpectedRecurring.reduce((s, tx) => s + tx.amount, 0)
+    + manualItems.filter(i => !dismissedIds.has(i.id)).reduce((s, i) => s + i.amount, 0)
 
   // One-off estimate: average one-off spend from base statement (can't predict specifics)
   const baseOneOffTotal = baseAnalysis
@@ -169,48 +185,98 @@ export function MidPeriodView({
       </div>
 
       {/* Still Expected — Recurring */}
-      {baseAnalysis && (
-        <div className="bg-slate-800 rounded-xl overflow-hidden">
-          <button
-            onClick={() => setOpenExpected(v => !v)}
-            className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-700/20 transition-colors border-b border-slate-700/50"
-          >
-            <div className="flex items-center gap-2">
-              <Chevron open={openExpected} />
-              <span className="text-xs text-slate-300 font-medium uppercase tracking-widest">Still Expected — Recurring</span>
-              <span className="text-xs text-slate-600">{stillExpectedRecurring.length} items not yet posted</span>
-            </div>
-            <span className="text-sm font-semibold text-blue-400 tabular-nums">{fmt(stillExpectedRecurringTotal)}</span>
-          </button>
-          {openExpected && (
-            stillExpectedRecurring.length === 0 ? (
-              <div className="px-4 py-6 text-center text-xs text-slate-500">
-                All recurring items from {baseAnalysis.month} have already posted this period.
+      <div className="bg-slate-800 rounded-xl overflow-hidden">
+        <button
+          onClick={() => setOpenExpected(v => !v)}
+          className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-700/20 transition-colors border-b border-slate-700/50"
+        >
+          <div className="flex items-center gap-2">
+            <Chevron open={openExpected} />
+            <span className="text-xs text-slate-300 font-medium uppercase tracking-widest">Still Expected — Recurring</span>
+            <span className="text-xs text-slate-600">{stillExpectedRecurring.length + manualItems.filter(i => !dismissedIds.has(i.id)).length} items</span>
+          </div>
+          <span className="text-sm font-semibold text-blue-400 tabular-nums">{fmt(stillExpectedRecurringTotal)}</span>
+        </button>
+        {openExpected && (
+          <div className="divide-y divide-slate-700/30">
+            {stillExpectedRecurring.length === 0 && manualItems.filter(i => !dismissedIds.has(i.id)).length === 0 && (
+              <div className="px-4 py-4 text-center text-xs text-slate-500">
+                {baseAnalysis ? `All recurring items from ${baseAnalysis.month} have already posted.` : 'No items — add one below.'}
+              </div>
+            )}
+            {/* From base statement */}
+            {stillExpectedRecurring.map(tx => (
+              <div key={tx.id} className="px-4 py-2.5 flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-slate-300 truncate">{tx.description}</div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs text-slate-600">{tx.category}</span>
+                    {tx.person && (
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${tx.person === 'Bryan' ? 'bg-violet-900/50 text-violet-300' : 'bg-pink-900/50 text-pink-300'}`}>{tx.person}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-xs text-slate-600 italic">~{tx.date.slice(5).replace('-', '/')}</span>
+                  <span className="text-sm font-medium text-slate-300 tabular-nums w-16 text-right">{fmt(tx.amount)}</span>
+                  <button onClick={() => dismiss(tx.id)} title="Remove" className="text-slate-600 hover:text-red-400 transition-colors ml-1">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+              </div>
+            ))}
+            {/* Manually added */}
+            {manualItems.filter(i => !dismissedIds.has(i.id)).map(item => (
+              <div key={item.id} className="px-4 py-2.5 flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-slate-300 truncate">{item.description}</div>
+                  <div className="text-xs text-slate-600 mt-0.5">manually added</div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-sm font-medium text-slate-300 tabular-nums w-16 text-right">{fmt(item.amount)}</span>
+                  <button onClick={() => dismiss(item.id)} title="Remove" className="text-slate-600 hover:text-red-400 transition-colors ml-1">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+              </div>
+            ))}
+            {/* Add row */}
+            {addingManual ? (
+              <div className="px-4 py-2.5 flex items-center gap-2 bg-slate-900/30">
+                <input
+                  autoFocus
+                  placeholder="Description"
+                  className="flex-1 bg-slate-700 text-sm text-slate-200 rounded px-2 py-1 border border-slate-600 focus:border-blue-500 outline-none"
+                  value={manualDesc}
+                  onChange={e => setManualDesc(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') commitManual(); if (e.key === 'Escape') setAddingManual(false) }}
+                />
+                <input
+                  type="number" step="0.01" min="0" placeholder="0.00"
+                  className="w-24 bg-slate-700 text-sm text-slate-200 rounded px-2 py-1 border border-slate-600 focus:border-blue-500 outline-none text-right tabular-nums"
+                  value={manualAmt}
+                  onChange={e => setManualAmt(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') commitManual(); if (e.key === 'Escape') setAddingManual(false) }}
+                />
+                <button onClick={commitManual} className="text-slate-500 hover:text-emerald-400 transition-colors">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                </button>
+                <button onClick={() => setAddingManual(false)} className="text-slate-600 hover:text-slate-400 transition-colors">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
               </div>
             ) : (
-              <div className="divide-y divide-slate-700/30">
-                {stillExpectedRecurring.map(tx => (
-                  <div key={tx.id} className="px-4 py-2.5 flex items-center gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm text-slate-300 truncate">{tx.description}</div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs text-slate-600">{tx.category}</span>
-                        {tx.person && (
-                          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${tx.person === 'Bryan' ? 'bg-violet-900/50 text-violet-300' : 'bg-pink-900/50 text-pink-300'}`}>{tx.person}</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-xs text-slate-600 italic">~{tx.date.slice(5).replace('-', '/')}</span>
-                      <span className="text-sm font-medium text-slate-300 tabular-nums w-16 text-right">{fmt(tx.amount)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )
-          )}
-        </div>
-      )}
+              <button
+                onClick={() => setAddingManual(true)}
+                className="w-full px-4 py-2 text-xs text-slate-600 hover:text-slate-400 transition-colors text-left flex items-center gap-1.5"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                Add expected item
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Still Expected — One-offs estimate */}
       {baseAnalysis && baseOneOffTotal > 0 && (
