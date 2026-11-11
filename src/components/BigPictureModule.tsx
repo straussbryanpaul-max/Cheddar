@@ -513,12 +513,12 @@ function ForecastRow({ item, onUpdate, onDelete, accountOptions }: ForecastRowPr
   }
 
   return (
-    <div className="flex items-center gap-3 group py-1">
+    <div className="flex items-center gap-3 py-1">
       <span className="text-xs text-slate-500 w-20 shrink-0">{item.date}</span>
       <span className="text-sm text-slate-200 flex-1 min-w-0 truncate">{item.description}</span>
       <AmountColor amount={item.amount} />
       <span className="text-xs text-slate-500 w-24 text-right shrink-0">{item.runningBalance.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })}</span>
-      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex gap-1">
         <button onClick={() => setEditing(true)} className="text-slate-500 hover:text-slate-300 p-0.5">
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
