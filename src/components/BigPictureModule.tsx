@@ -32,6 +32,9 @@ export function BigPictureModule() {
   const addForecastItem = useStore(s => s.addForecastItem)
   const updateForecastItem = useStore(s => s.updateForecastItem)
   const deleteForecastItem = useStore(s => s.deleteForecastItem)
+  const bigPictureNotes = useStore(s => s.bigPictureNotes)
+  const addBigPictureNote = useStore(s => s.addBigPictureNote)
+  const deleteBigPictureNote = useStore(s => s.deleteBigPictureNote)
 
   // ── Current period ────────────────────────────────────────────────────────
   const today = new Date().toISOString().split('T')[0]
@@ -552,6 +555,51 @@ export function BigPictureModule() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Scratch pad */}
+      <ScratchPad notes={bigPictureNotes} onAdd={addBigPictureNote} onDelete={deleteBigPictureNote} />
+    </div>
+  )
+}
+
+// ── Scratch pad ───────────────────────────────────────────────────────────────
+
+function ScratchPad({ notes, onAdd, onDelete }: { notes: string[]; onAdd: (t: string) => void; onDelete: (i: number) => void }) {
+  const [draft, setDraft] = React.useState('')
+  function commit() {
+    const t = draft.trim()
+    if (t) { onAdd(t); setDraft('') }
+  }
+  return (
+    <div className="bg-slate-800/40 border border-slate-700/30 rounded-xl p-4">
+      <div className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-3">Don't Forget</div>
+      {notes.length > 0 && (
+        <ul className="space-y-1.5 mb-3">
+          {notes.map((note, i) => (
+            <li key={i} className="flex items-start gap-2 group">
+              <span className="text-slate-500 mt-0.5 text-xs">•</span>
+              <span className="text-sm text-slate-200 flex-1">{note}</span>
+              <button
+                onClick={() => onDelete(i)}
+                className="text-slate-600 hover:text-red-400 transition-colors text-xs shrink-0 mt-0.5"
+              >✕</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex gap-2">
+        <input
+          className="flex-1 bg-slate-700/60 border border-slate-600/50 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-500 outline-none focus:border-blue-500"
+          placeholder="add a note..."
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') commit() }}
+        />
+        <button
+          onClick={commit}
+          className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg px-3 py-1.5 transition-colors"
+        >Add</button>
       </div>
     </div>
   )

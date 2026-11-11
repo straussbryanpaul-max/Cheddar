@@ -127,6 +127,11 @@ interface State {
   updateForecastItem: (id: string, updates: Partial<ForecastItem>) => void
   deleteForecastItem: (id: string) => void
 
+  // Big Picture scratch notes
+  bigPictureNotes: string[]
+  addBigPictureNote: (text: string) => void
+  deleteBigPictureNote: (index: number) => void
+
   // UI preferences (persistent across sessions, synced via Supabase)
   uiPrefs: UiPrefs
   setUiPrefs: (updates: Partial<UiPrefs>) => void
@@ -274,6 +279,7 @@ export const useStore = create<State>()(
       collegeFVAccounts: [],
       collegeForecastYears: [],
       forecastItems: [],
+      bigPictureNotes: [],
 
       uiPrefs: {
         currentModule: 'budget',
@@ -824,6 +830,11 @@ export const useStore = create<State>()(
         set(s => ({ forecastItems: s.forecastItems.map(fi => fi.id === id ? { ...fi, ...updates } : fi) })),
       deleteForecastItem: (id) =>
         set(s => ({ forecastItems: s.forecastItems.filter(fi => fi.id !== id) })),
+
+      addBigPictureNote: (text) =>
+        set(s => ({ bigPictureNotes: [...s.bigPictureNotes, text] })),
+      deleteBigPictureNote: (index) =>
+        set(s => ({ bigPictureNotes: s.bigPictureNotes.filter((_, i) => i !== index) })),
 
       copyForecastLinesDown: (yearId, kind) =>
         set(s => {
