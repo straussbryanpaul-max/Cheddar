@@ -481,7 +481,7 @@ export function BigPictureModule() {
         ) : (
           <div className="space-y-3">
             {acctGrouped.map(([acctId, items]) => {
-              const isOpen = openAccts[acctId] !== false // default open
+              const isOpen = openAccts[acctId] === true // default closed
               const lastBalance = items[items.length - 1]!.runningBalance
               return (
                 <div key={acctId}>
