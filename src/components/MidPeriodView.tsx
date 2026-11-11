@@ -2,6 +2,18 @@ import { useState } from 'react'
 import type { CCMonthlyAnalysis, CCTransaction } from '../types'
 import { useFormatCurrency } from '../lib/useFormatCurrency'
 
+function groupByCategory(txs: CCTransaction[]) {
+  const map = new Map<string, { txList: CCTransaction[]; total: number }>()
+  for (const tx of txs) {
+    const e = map.get(tx.category)
+    if (e) { e.txList.push(tx); e.total += tx.amount }
+    else map.set(tx.category, { txList: [tx], total: tx.amount })
+  }
+  return [...map.entries()]
+    .map(([cat, d]) => ({ cat, ...d }))
+    .sort((a, b) => b.total - a.total)
+}
+
 function normalize(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
 }
@@ -79,6 +91,10 @@ export function MidPeriodView({
   const [openRecurring, setOpenRecurring] = useState(true)
   const [openOneOff, setOpenOneOff] = useState(true)
   const [openExpected, setOpenExpected] = useState(true)
+  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set())
+  const toggleCat = (key: string) => setExpandedCats(prev => {
+    const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next
+  })
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set())
   const [manualItems, setManualItems] = useState<{ id: string; description: string; amount: number }[]>([])
   const [addingManual, setAddingManual] = useState(false)
@@ -292,7 +308,7 @@ export function MidPeriodView({
         </div>
       )}
 
-      {/* Recurring charged so far */}
+      {/* By Category — Recurring (posted) */}
       {recurringTxs.length > 0 && (
         <div className="bg-slate-800 rounded-xl overflow-hidden">
           <button
@@ -301,20 +317,49 @@ export function MidPeriodView({
           >
             <div className="flex items-center gap-2">
               <Chevron open={openRecurring} />
-              <span className="text-xs text-slate-300 font-medium uppercase tracking-widest">Recurring — Posted</span>
-              <span className="text-xs text-slate-600">{recurringTxs.length} items</span>
+              <span className="text-xs text-slate-300 font-medium uppercase tracking-widest">By Category — Recurring</span>
             </div>
-            <span className="text-sm font-semibold text-blue-400 tabular-nums">{fmt(recurringSoFar)}</span>
+            <div className="flex items-center gap-2.5">
+              <span className="text-xs text-slate-500">{recurringTxs.length} items</span>
+              <span className="text-sm font-semibold text-blue-400 tabular-nums">{fmt(recurringSoFar)}</span>
+            </div>
           </button>
-          {openRecurring && (
-            <div className="divide-y divide-slate-700/30">
-              {recurringTxs.map(tx => <TxRow key={tx.id} tx={tx} fmt={fmt} />)}
-            </div>
-          )}
+          {openRecurring && groupByCategory(recurringTxs).map(({ cat, txList, total: catTotal }) => {
+            const catKey = `r:${cat}`
+            const catOpen = expandedCats.has(catKey)
+            return (
+              <div key={catKey} className="border-b border-slate-700/30 last:border-b-0">
+                <button onClick={() => toggleCat(catKey)} className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-slate-700/20 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <Chevron open={catOpen} />
+                    <span className="text-sm text-slate-200">{cat}</span>
+                    <span className="text-xs text-slate-600">{txList.length} {txList.length === 1 ? 'item' : 'items'}</span>
+                  </div>
+                  <span className="text-sm font-medium text-slate-300 tabular-nums">{fmt(catTotal)}</span>
+                </button>
+                {catOpen && (
+                  <div className="bg-slate-900/30">
+                    {txList.map(tx => (
+                      <div key={tx.id} className="pl-8 pr-4 py-2 flex items-center gap-2 border-t border-slate-700/20">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm text-slate-300 truncate">{tx.description}</div>
+                          <div className="text-xs text-slate-600">{tx.date}</div>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {tx.person && <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${tx.person === 'Bryan' ? 'bg-violet-900/50 text-violet-300' : 'bg-pink-900/50 text-pink-300'}`}>{tx.person}</span>}
+                          <span className="text-sm font-medium text-slate-300 tabular-nums w-16 text-right">{fmt(tx.amount)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 
-      {/* One-offs charged so far */}
+      {/* By Category — One-off (posted) */}
       {oneOffTxs.length > 0 && (
         <div className="bg-slate-800 rounded-xl overflow-hidden">
           <button
@@ -323,16 +368,45 @@ export function MidPeriodView({
           >
             <div className="flex items-center gap-2">
               <Chevron open={openOneOff} />
-              <span className="text-xs text-slate-300 font-medium uppercase tracking-widest">One-offs — Posted</span>
-              <span className="text-xs text-slate-600">{oneOffTxs.length} items</span>
+              <span className="text-xs text-slate-300 font-medium uppercase tracking-widest">By Category — One Off</span>
             </div>
-            <span className="text-sm font-semibold text-amber-400 tabular-nums">{fmt(oneOffSoFar)}</span>
+            <div className="flex items-center gap-2.5">
+              <span className="text-xs text-slate-500">{oneOffTxs.length} items</span>
+              <span className="text-sm font-semibold text-amber-400 tabular-nums">{fmt(oneOffSoFar)}</span>
+            </div>
           </button>
-          {openOneOff && (
-            <div className="divide-y divide-slate-700/30">
-              {oneOffTxs.map(tx => <TxRow key={tx.id} tx={tx} fmt={fmt} />)}
-            </div>
-          )}
+          {openOneOff && groupByCategory(oneOffTxs).map(({ cat, txList, total: catTotal }) => {
+            const catKey = `o:${cat}`
+            const catOpen = expandedCats.has(catKey)
+            return (
+              <div key={catKey} className="border-b border-slate-700/30 last:border-b-0">
+                <button onClick={() => toggleCat(catKey)} className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-slate-700/20 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <Chevron open={catOpen} />
+                    <span className="text-sm text-slate-200">{cat}</span>
+                    <span className="text-xs text-slate-600">{txList.length} {txList.length === 1 ? 'item' : 'items'}</span>
+                  </div>
+                  <span className="text-sm font-medium text-slate-300 tabular-nums">{fmt(catTotal)}</span>
+                </button>
+                {catOpen && (
+                  <div className="bg-slate-900/30">
+                    {txList.map(tx => (
+                      <div key={tx.id} className="pl-8 pr-4 py-2 flex items-center gap-2 border-t border-slate-700/20">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm text-slate-300 truncate">{tx.description}</div>
+                          <div className="text-xs text-slate-600">{tx.date}</div>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {tx.person && <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${tx.person === 'Bryan' ? 'bg-violet-900/50 text-violet-300' : 'bg-pink-900/50 text-pink-300'}`}>{tx.person}</span>}
+                          <span className="text-sm font-medium text-slate-300 tabular-nums w-16 text-right">{fmt(tx.amount)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
