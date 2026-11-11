@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, AccountAdjustment, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan, CCMonthlyAnalysis, CCTransaction, CCMerchantMemory, MerchantMemoryEntry, AmazonSubscribeItem, CollegeKid, CollegeFVAccount, CollegeForecastYear, CollegeExpenseLine, CollegeExpenseCategory, CollegeContributionLine, UiPrefs } from '../types'
+import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, AccountAdjustment, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan, CCMonthlyAnalysis, CCTransaction, CCMerchantMemory, MerchantMemoryEntry, AmazonSubscribeItem, CollegeKid, CollegeFVAccount, CollegeForecastYear, CollegeExpenseLine, CollegeExpenseCategory, CollegeContributionLine, UiPrefs, ForecastItem } from '../types'
 import { nextPeriodStart, prevPeriodStart, billIncludedInPeriod } from '../lib/periods'
 
 interface State {
@@ -120,6 +120,12 @@ interface State {
   updateCollegeContributionLine: (yearId: string, lineId: string, updates: Partial<CollegeContributionLine>) => void
   deleteCollegeContributionLine: (yearId: string, lineId: string) => void
   copyForecastLinesDown: (yearId: string, kind: 'expense' | 'contribution') => void
+
+  // Big Picture forecast items
+  forecastItems: ForecastItem[]
+  addForecastItem: (item: Omit<ForecastItem, 'id'>) => void
+  updateForecastItem: (id: string, updates: Partial<ForecastItem>) => void
+  deleteForecastItem: (id: string) => void
 
   // UI preferences (persistent across sessions, synced via Supabase)
   uiPrefs: UiPrefs
@@ -267,6 +273,7 @@ export const useStore = create<State>()(
       collegeKids: SEED_COLLEGE_KIDS,
       collegeFVAccounts: [],
       collegeForecastYears: [],
+      forecastItems: [],
 
       uiPrefs: {
         currentModule: 'budget',
@@ -810,6 +817,13 @@ export const useStore = create<State>()(
             }
           ),
         })),
+
+      addForecastItem: (item) =>
+        set(s => ({ forecastItems: [...s.forecastItems, { ...item, id: uid() }] })),
+      updateForecastItem: (id, updates) =>
+        set(s => ({ forecastItems: s.forecastItems.map(fi => fi.id === id ? { ...fi, ...updates } : fi) })),
+      deleteForecastItem: (id) =>
+        set(s => ({ forecastItems: s.forecastItems.filter(fi => fi.id !== id) })),
 
       copyForecastLinesDown: (yearId, kind) =>
         set(s => {

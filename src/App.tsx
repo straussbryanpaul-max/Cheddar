@@ -9,6 +9,7 @@ import { Charts } from './components/Charts'
 import { StatementPanel } from './components/StatementPanel'
 import { CCModule } from './components/CCModule'
 import { CollegeModule } from './components/CollegeModule'
+import { BigPictureModule } from './components/BigPictureModule'
 import { LoginScreen } from './components/LoginScreen'
 import { HouseholdOnboarding } from './components/HouseholdOnboarding'
 import { useAuth } from './lib/auth'
@@ -17,6 +18,7 @@ import { formatDate, periodEndDate, buildProjectedOpenings } from './lib/periods
 import type { AppModule } from './types'
 
 const MODULES: { id: AppModule; label: string; soon?: boolean }[] = [
+  { id: 'big-picture', label: 'Big Picture' },
   { id: 'budget',  label: 'Budget' },
   { id: 'savings', label: 'Savings & Retirement' },
   { id: 'cc',      label: 'Credit Card' },
@@ -206,6 +208,7 @@ function BudgetApp({ householdId, userId }: { householdId: string; userId: strin
 
       <div className="max-w-7xl mx-auto px-4 py-6 flex gap-4 items-start">
         <main className="flex-1 min-w-0">
+          {module === 'big-picture' && <BigPictureModule />}
           {module === 'bills'   && <BillsManager />}
           {module === 'savings' && <WealthModule />}
           {module === 'cc'      && <CCModule />}

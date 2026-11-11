@@ -268,7 +268,15 @@ export interface CollegeForecastYear {
   closedOut: boolean
 }
 
-export type AppModule = 'budget' | 'savings' | 'college' | 'bills' | 'cc'
+export type AppModule = 'budget' | 'savings' | 'college' | 'bills' | 'cc' | 'big-picture'
+
+export interface ForecastItem {
+  id: string
+  description: string
+  amount: number      // positive = incoming/deposit, negative = expense/withdrawal
+  date: string        // YYYY-MM-DD
+  accountId: string   // 'checking' | 'cc' | wealth account id
+}
 
 export type WealthTab = 'accounts' | 'projections' | 'retirement'
 
