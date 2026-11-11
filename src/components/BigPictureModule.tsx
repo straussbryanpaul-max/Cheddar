@@ -317,7 +317,7 @@ export function BigPictureModule() {
           )}
           {checkingPeriodRows.map((row, i) => (
             <TileRow key={i} label={row.label}>
-              <span className="text-slate-300">{fmt(row.end)}</span>
+              <span className="text-sm font-semibold text-slate-100">{fmt(row.end)}</span>
             </TileRow>
           ))}
           {stillOutItems.length > 0 && (
@@ -349,7 +349,7 @@ export function BigPictureModule() {
           )}
           {ccMonthRows.map((row, i) => (
             <TileRow key={i} label={row.label}>
-              <span className="text-slate-300">{fmt(row.end)}</span>
+              <span className="text-sm font-semibold text-slate-100">{fmt(row.end)}</span>
             </TileRow>
           ))}
           {remainingRecurring.length > 0 && ccCurrentBalance !== null && (
@@ -369,7 +369,7 @@ export function BigPictureModule() {
           <TileBigNum>{fmt(specTotal)}</TileBigNum>
           {specEndForecast !== null && specEndForecast !== specTotal && (
             <TileRow label="Forecast">
-              <span className="text-slate-300">{fmt(specEndForecast)}</span>
+              <span className="text-sm font-semibold text-slate-100">{fmt(specEndForecast)}</span>
             </TileRow>
           )}
           {specAccounts.length > 0 && (
@@ -390,7 +390,7 @@ export function BigPictureModule() {
             <TileBigNum>{fmt(hsaTotal)}</TileBigNum>
             {hsaEndForecast !== null && hsaEndForecast !== hsaTotal && (
               <TileRow label="Forecast">
-                <span className="text-slate-300">{fmt(hsaEndForecast)}</span>
+                <span className="text-sm font-semibold text-slate-100">{fmt(hsaEndForecast)}</span>
               </TileRow>
             )}
             <TileRow label={hsaAccounts.length > 1 ? `${hsaAccounts.length} accounts` : (hsaAccounts[0]?.institution ?? '')}><span /></TileRow>
@@ -416,7 +416,7 @@ export function BigPictureModule() {
           )}
           {boaAccount && boaEndForecast !== null && boaEndForecast !== boaAccount.balance && (
             <TileRow label="Forecast">
-              <span className="text-slate-300">{fmt(boaEndForecast)}</span>
+              <span className="text-sm font-semibold text-slate-100">{fmt(boaEndForecast)}</span>
             </TileRow>
           )}
           {boaAccount && <TileRow label={boaAccount.name}><span /></TileRow>}
