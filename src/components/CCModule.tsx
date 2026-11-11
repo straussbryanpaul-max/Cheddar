@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react'
 import { useStore } from '../store'
 import { useAuth } from '../lib/auth'
-import { analyzeCreditCard, matchAmazonSubscribeSave, type StatementFile } from '../lib/analyzeCreditCard'
+import { analyzeCreditCard, analyzeMidPeriod, matchAmazonSubscribeSave, type StatementFile } from '../lib/analyzeCreditCard'
 import { useFormatCurrency } from '../lib/useFormatCurrency'
 import { CCCharts } from './CCCharts'
+import { MidPeriodView } from './MidPeriodView'
 import type { CCMonthlyAnalysis, CCTransaction, AmazonSubscribeItem } from '../types'
 
 const CC_CATEGORIES = [
@@ -13,7 +14,7 @@ const CC_CATEGORIES = [
   'Clothing', 'Personal Care', 'Insurance', 'Utilities', 'Other',
 ]
 
-type Step = 'results' | 'upload' | 'loading'
+type Step = 'results' | 'upload' | 'mid-period-upload' | 'loading'
 
 function Chevron({ open, className = '' }: { open: boolean; className?: string }) {
   return (
@@ -167,6 +168,25 @@ export function CCModule() {
     }
   }
 
+  async function runMidPeriodAnalysis() {
+    if (!statementFile) { setError('Please select a file first.'); return }
+    const key = editingKey ? apiKeyDraft : anthropicApiKey
+    if (!key) { setError('An Anthropic API key is required.'); return }
+    if (editingKey) { setAnthropicApiKey(apiKeyDraft); setEditingKey(false) }
+    setError('')
+    setStep('loading')
+    try {
+      const result = await analyzeMidPeriod(statementFile, key, ccMerchantMemory)
+      saveCCAnalysis(result)
+      setSelectedId(result.id)
+      setStep('results')
+      setStatementFile(null); setStatementFileName('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Analysis failed')
+      setStep('mid-period-upload')
+    }
+  }
+
   async function runMatch(target: CCMonthlyAnalysis) {
     const key = anthropicApiKey
     if (!key) { setMatchError('Set an Anthropic API key first.'); return }
@@ -265,6 +285,54 @@ export function CCModule() {
     )
   }
 
+  // ── Mid-Period Upload ─────────────────────────────────────────────────────────
+  if (step === 'mid-period-upload') {
+    return (
+      <div className="max-w-lg mx-auto space-y-4">
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Mid-Period Analysis</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Upload a partial transaction export to project your final bill</p>
+          </div>
+          <button onClick={() => setStep(ccAnalyses.length > 0 ? 'results' : 'upload')} className="text-sm text-slate-400 hover:text-white transition-colors">Cancel</button>
+        </div>
+
+        <div className="bg-slate-800 rounded-xl p-4">
+          <div className="flex items-center gap-1.5 mb-3">
+            <div className="text-xs text-slate-500 uppercase tracking-widest">Transaction Export</div>
+            <div className="text-xs text-red-400">required</div>
+            <div className="text-xs text-slate-600 ml-auto">PDF or CSV</div>
+          </div>
+          <div className="border-2 border-dashed border-slate-600 rounded-xl p-5 text-center cursor-pointer hover:border-blue-500/60 transition-colors" onClick={() => ccFileRef.current?.click()}>
+            <input ref={ccFileRef} type="file" accept=".pdf,.csv,application/pdf,text/csv" className="hidden" onChange={handleStatementFile} />
+            {statementFileName ? (
+              <div>
+                <div className="text-emerald-400 text-sm font-medium">{statementFileName}</div>
+                <div className="text-slate-500 text-xs mt-1">{statementFile?.type === 'pdf' ? 'PDF' : `${(statementFile as { type: 'csv'; content: string })?.content.split('\n').length - 1} rows`}</div>
+              </div>
+            ) : (
+              <div>
+                <svg className="w-7 h-7 text-slate-600 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                </svg>
+                <div className="text-slate-400 text-sm">Click to select export</div>
+                <div className="text-slate-600 text-xs mt-1">Download mid-cycle from Barclays → Accounts → Transactions</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {error && <div className="text-red-400 text-sm bg-red-900/20 border border-red-800/40 rounded-lg px-4 py-3">{error}</div>}
+
+        <button
+          onClick={runMidPeriodAnalysis}
+          disabled={!statementFile || (!anthropicApiKey && !apiKeyDraft)}
+          className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors"
+        >Analyze Mid-Period</button>
+      </div>
+    )
+  }
+
   // ── Loading ──────────────────────────────────────────────────────────────────
   if (step === 'loading') {
     return (
@@ -340,6 +408,15 @@ export function CCModule() {
             <button onClick={() => setDeleteConfirmId(analysis.id)} className="text-xs text-slate-600 hover:text-red-400 transition-colors">Delete</button>
           )}
           <button
+            onClick={() => { setStatementFile(null); setStatementFileName(''); setError(''); setStep('mid-period-upload') }}
+            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 border border-slate-700/50 hover:border-slate-600 rounded-lg px-3 py-1.5 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            Mid-Period
+          </button>
+          <button
             onClick={() => setStep('upload')}
             className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 border border-slate-700/50 hover:border-slate-600 rounded-lg px-3 py-1.5 transition-colors"
           >
@@ -374,10 +451,31 @@ export function CCModule() {
           <button
             key={a.id}
             onClick={() => setSelectedId(a.id)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${a.id === selectedId ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'}`}
-          >{a.month}</button>
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${a.id === selectedId ? (a.type === 'mid-period' ? 'bg-violet-700 text-white' : 'bg-blue-600 text-white') : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'}`}
+          >{a.month}{a.type === 'mid-period' ? ' (mid)' : ''}</button>
         ))}
       </div>
+
+      {/* Mid-period view — renders instead of normal results */}
+      {analysis.type === 'mid-period' && (() => {
+        const baseAnalysis = (() => {
+          const statementOptions = sortedAnalyses.filter(a => a.type !== 'mid-period')
+          return ccProjectionBaseId
+            ? statementOptions.find(a => a.id === ccProjectionBaseId) ?? statementOptions[0] ?? null
+            : statementOptions[0] ?? null
+        })()
+        return (
+          <MidPeriodView
+            midPeriod={analysis}
+            baseAnalysis={baseAnalysis}
+            sortedAnalyses={sortedAnalyses}
+            personFilter={personFilter}
+            projectionBaseId={ccProjectionBaseId}
+            onChangeProjectionBase={id => setUiPrefs({ ccProjectionBaseId: id })}
+          />
+        )
+      })()}
+      {analysis.type === 'mid-period' ? null : <>
 
       {/* Person filter + Flagged toggle */}
       <div className="flex items-center justify-between gap-2">
@@ -906,6 +1004,7 @@ export function CCModule() {
 
       </div>{/* end two-column grid */}
       </>}{/* end results view */}
+      </>}{/* end non-mid-period block */}
     </div>
   )
 }

@@ -107,6 +107,7 @@ export interface CCMonthlyAnalysis {
   transactions: CCTransaction[]
   reductionSuggestions: CCReductionSuggestion[]
   notes: string
+  type?: 'statement' | 'mid-period'
 }
 
 // Persistent Amazon Subscribe & Save list — not tied to any single statement.
