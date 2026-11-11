@@ -270,6 +270,33 @@ export interface CollegeForecastYear {
 
 export type AppModule = 'budget' | 'savings' | 'college' | 'bills' | 'cc' | 'big-picture' | 'bonus-calc'
 
+export interface BonusCalcBucket {
+  id: string
+  label: string
+  amount: string
+}
+
+export interface BonusCalcDraft {
+  gross: string
+  federalRate: string
+  stateRate: string
+  ssYtd: string
+  k401Rate: string
+  buckets: BonusCalcBucket[]
+}
+
+export interface BonusSnapshot {
+  id: string
+  name: string
+  savedAt: string
+  draft: BonusCalcDraft
+}
+
+export interface BonusCalcState {
+  draft: BonusCalcDraft
+  snapshots: BonusSnapshot[]
+}
+
 export interface ForecastItem {
   id: string
   description: string

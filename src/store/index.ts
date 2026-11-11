@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, AccountAdjustment, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan, CCMonthlyAnalysis, CCTransaction, CCMerchantMemory, MerchantMemoryEntry, AmazonSubscribeItem, CollegeKid, CollegeFVAccount, CollegeForecastYear, CollegeExpenseLine, CollegeExpenseCategory, CollegeContributionLine, UiPrefs, ForecastItem } from '../types'
+import type { Bill, PayPeriod, PeriodItem, Extra, QuickLink, PayFrequency, PeriodActuals, ActualEntry, WealthAccount, AccountAdjustment, ProjectionCalcAccount, ProjectionSnapshot, SnapshotMilestone, RetirementExpense, RetirementPlan, CCMonthlyAnalysis, CCTransaction, CCMerchantMemory, MerchantMemoryEntry, AmazonSubscribeItem, CollegeKid, CollegeFVAccount, CollegeForecastYear, CollegeExpenseLine, CollegeExpenseCategory, CollegeContributionLine, UiPrefs, ForecastItem, BonusCalcState, BonusCalcDraft } from '../types'
 import { nextPeriodStart, prevPeriodStart, billIncludedInPeriod } from '../lib/periods'
 
 interface State {
@@ -126,6 +126,12 @@ interface State {
   addForecastItem: (item: Omit<ForecastItem, 'id'>) => void
   updateForecastItem: (id: string, updates: Partial<ForecastItem>) => void
   deleteForecastItem: (id: string) => void
+
+  // Bonus calculator
+  bonusCalc: BonusCalcState
+  setBonusCalcDraft: (updates: Partial<BonusCalcDraft>) => void
+  saveBonusSnapshot: (name: string) => void
+  deleteBonusSnapshot: (id: string) => void
 
   // Big Picture scratch notes
   bigPictureNotes: string[]
@@ -280,6 +286,14 @@ export const useStore = create<State>()(
       collegeFVAccounts: [],
       collegeForecastYears: [],
       forecastItems: [],
+      bonusCalc: {
+        draft: { gross: '', federalRate: '22', stateRate: '5', ssYtd: '', k401Rate: '6', buckets: [
+          { id: '1', label: 'Spending / fun', amount: '' },
+          { id: '2', label: 'Investments', amount: '' },
+          { id: '3', label: 'Emergency fund', amount: '' },
+        ]},
+        snapshots: [],
+      },
       bigPictureNotes: [],
 
       uiPrefs: {
@@ -831,6 +845,18 @@ export const useStore = create<State>()(
         set(s => ({ forecastItems: s.forecastItems.map(fi => fi.id === id ? { ...fi, ...updates } : fi) })),
       deleteForecastItem: (id) =>
         set(s => ({ forecastItems: s.forecastItems.filter(fi => fi.id !== id) })),
+
+      setBonusCalcDraft: (updates) =>
+        set(s => ({ bonusCalc: { ...s.bonusCalc, draft: { ...s.bonusCalc.draft, ...updates } } })),
+      saveBonusSnapshot: (name) =>
+        set(s => ({
+          bonusCalc: {
+            ...s.bonusCalc,
+            snapshots: [...s.bonusCalc.snapshots, { id: uid(), name, savedAt: new Date().toISOString(), draft: { ...s.bonusCalc.draft, buckets: s.bonusCalc.draft.buckets.map(b => ({ ...b })) } }],
+          }
+        })),
+      deleteBonusSnapshot: (id) =>
+        set(s => ({ bonusCalc: { ...s.bonusCalc, snapshots: s.bonusCalc.snapshots.filter(s => s.id !== id) } })),
 
       addBigPictureNote: (text) =>
         set(s => ({ bigPictureNotes: [...s.bigPictureNotes, text] })),
