@@ -310,7 +310,16 @@ export function BigPictureModule() {
         <div className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-4 space-y-1">
           <div className="text-xs text-slate-400 font-medium uppercase tracking-wide">Spec Total</div>
           <div className="text-2xl font-bold text-white">{fmt(specTotal)}</div>
-          <div className="text-xs text-slate-500">{specAccounts.length} account{specAccounts.length !== 1 ? 's' : ''}</div>
+          {specAccounts.length > 0 && (
+            <div className="pt-1 space-y-0.5">
+              {specAccounts.map(a => (
+                <div key={a.id} className="flex items-center justify-between text-xs">
+                  <span className="text-slate-400 truncate pr-2">{a.name}</span>
+                  <span className="text-slate-500 shrink-0">{fmt(a.balance)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* HSA */}
