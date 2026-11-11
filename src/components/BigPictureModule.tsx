@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useStore } from '../store'
 import { calcForecast, periodEndDate, formatDate, buildProjectedOpenings } from '../lib/periods'
 import type { ForecastItem } from '../types'
@@ -262,7 +262,7 @@ export function BigPictureModule() {
   // Group by account and compute running balance
   const accountBalances: Record<string, number> = {
     checking: checkingBalance ?? 0,
-    cc: ccCurrentBalance ?? 0,
+    cc: ccProjectedFinal ?? ccCurrentBalance ?? 0,
     ...savingsAccounts.reduce((acc, a) => ({ ...acc, [a.id]: a.balance }), {}),
   }
 
@@ -290,14 +290,12 @@ export function BigPictureModule() {
       </div>
 
       {/* Top tiles */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
 
         {/* Checking */}
-        <div className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-4 space-y-1">
-          <div className="text-xs text-slate-400 font-medium uppercase tracking-wide">Checking Now</div>
+        <Tile label="Checking">
           {editingChecking ? (
-            <input
-              autoFocus
+            <input autoFocus
               className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm text-white"
               value={checkingDraft}
               onChange={e => setCheckingDraft(e.target.value)}
@@ -305,55 +303,31 @@ export function BigPictureModule() {
               onKeyDown={e => { if (e.key === 'Enter') commitChecking(); if (e.key === 'Escape') setEditingChecking(false) }}
             />
           ) : (
-            <button
-              onClick={() => { setCheckingDraft(checkingBalance?.toString() ?? ''); setEditingChecking(true) }}
-              className="text-2xl font-bold text-white hover:text-blue-300 transition-colors text-left w-full"
-            >
-              {checkingBalance !== null ? fmt(checkingBalance) : <span className="text-slate-500 text-base">tap to set</span>}
-            </button>
+            <TileBigNum onEdit={() => { setCheckingDraft(checkingBalance?.toString() ?? ''); setEditingChecking(true) }}>
+              {checkingBalance !== null ? fmt(checkingBalance) : null}
+            </TileBigNum>
           )}
-          {checkingPeriodRows.length > 0 && (
-            <div className="pt-1 space-y-0.5">
-              {checkingPeriodRows.map((row, i) => (
-                <div key={i} className="flex items-center justify-between text-xs">
-                  <span className="text-slate-500">{row.label}</span>
-                  <span className={row.end >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmt(row.end)}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          {checkingPeriodRows.map((row, i) => (
+            <TileRow key={i} label={row.label}>
+              <span className={row.end >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmt(row.end)}</span>
+            </TileRow>
+          ))}
           {stillOutItems.length > 0 && (
-            <div className="pt-1">
-              <button
-                onClick={() => setStillOutOpen(o => !o)}
-                className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
-              >
-                <svg className={`w-3 h-3 transition-transform ${stillOutOpen ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-                <span className="text-amber-500/80">{fmt(stillOutTotal)} still out</span>
-                <span className="text-slate-600">({stillOutItems.length})</span>
-              </button>
-              {stillOutOpen && (
-                <div className="mt-1.5 space-y-0.5 pl-4">
-                  {stillOutItems.map((item, i) => (
-                    <div key={i} className="flex items-center justify-between text-xs">
-                      <span className="text-slate-400 truncate pr-2">{item.name}</span>
-                      <span className="text-slate-500 shrink-0">{fmt(item.amount)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <TileCollapsible
+              open={stillOutOpen} onToggle={() => setStillOutOpen(o => !o)}
+              summary={<><span className="text-amber-500/80">{fmt(stillOutTotal)} still out</span><span className="text-slate-600 ml-1">({stillOutItems.length})</span></>}
+            >
+              {stillOutItems.map((item, i) => (
+                <TileRow key={i} label={item.name}><span className="text-slate-500">{fmt(item.amount)}</span></TileRow>
+              ))}
+            </TileCollapsible>
           )}
-        </div>
+        </Tile>
 
         {/* CC */}
-        <div className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-4 space-y-1">
-          <div className="text-xs text-slate-400 font-medium uppercase tracking-wide">CC Balance</div>
+        <Tile label="Credit Card">
           {editingCC ? (
-            <input
-              autoFocus
+            <input autoFocus
               className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm text-white"
               value={ccDraft}
               onChange={e => setCCDraft(e.target.value)}
@@ -361,98 +335,59 @@ export function BigPictureModule() {
               onKeyDown={e => { if (e.key === 'Enter') commitCC(); if (e.key === 'Escape') setEditingCC(false) }}
             />
           ) : (
-            <button
-              onClick={() => { setCCDraft(ccCurrentBalance?.toString() ?? ''); setEditingCC(true) }}
-              className="text-2xl font-bold text-white hover:text-blue-300 transition-colors text-left w-full"
-            >
-              {ccCurrentBalance !== null ? fmt(ccCurrentBalance) : <span className="text-slate-500 text-base">tap to set</span>}
-            </button>
+            <TileBigNum onEdit={() => { setCCDraft(ccCurrentBalance?.toString() ?? ''); setEditingCC(true) }}>
+              {ccCurrentBalance !== null ? fmt(ccCurrentBalance) : null}
+            </TileBigNum>
           )}
-          {ccMonthRows.length > 0 && (
-            <div className="pt-1 space-y-0.5">
-              {ccMonthRows.map((row, i) => (
-                <div key={i} className="flex items-center justify-between text-xs">
-                  <span className="text-slate-500">{row.label}</span>
-                  <span className="text-amber-400">{fmt(row.end)}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          {ccMonthRows.map((row, i) => (
+            <TileRow key={i} label={row.label}>
+              <span className="text-amber-400">{fmt(row.end)}</span>
+            </TileRow>
+          ))}
           {remainingRecurring.length > 0 && ccCurrentBalance !== null && (
-            <div className="pt-1">
-              <button
-                onClick={() => setCCStillOutOpen(o => !o)}
-                className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
-              >
-                <svg className={`w-3 h-3 transition-transform ${ccStillOutOpen ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-                <span className="text-amber-500/80">+{fmt(remainingRecurringTotal)} still expected</span>
-                <span className="text-slate-600">({remainingRecurring.length})</span>
-              </button>
-              {ccStillOutOpen && (
-                <div className="mt-1.5 space-y-0.5 pl-4">
-                  {remainingRecurring.map(tx => (
-                    <div key={tx.id} className="flex items-center justify-between text-xs">
-                      <span className="text-slate-400 truncate pr-2">{tx.description}</span>
-                      <span className="text-slate-500 shrink-0">{fmtExact(tx.amount)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <TileCollapsible
+              open={ccStillOutOpen} onToggle={() => setCCStillOutOpen(o => !o)}
+              summary={<><span className="text-amber-500/80">+{fmt(remainingRecurringTotal)} expected</span><span className="text-slate-600 ml-1">({remainingRecurring.length})</span></>}
+            >
+              {remainingRecurring.map(tx => (
+                <TileRow key={tx.id} label={tx.description}><span className="text-slate-500">{fmtExact(tx.amount)}</span></TileRow>
+              ))}
+            </TileCollapsible>
           )}
-        </div>
+        </Tile>
 
         {/* Spec */}
-        <div className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-4 space-y-1">
-          <div className="text-xs text-slate-400 font-medium uppercase tracking-wide">Spec Total</div>
-          <div className="text-2xl font-bold text-white">{fmt(specTotal)}</div>
+        <Tile label="Spec">
+          <TileBigNum>{fmt(specTotal)}</TileBigNum>
           {specEndForecast !== null && specEndForecast !== specTotal && (
-            <div className="text-xs text-slate-500">
-              Forecast: <span className={specEndForecast >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmt(specEndForecast)}</span>
-            </div>
+            <TileRow label="Forecast">
+              <span className={specEndForecast >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmt(specEndForecast)}</span>
+            </TileRow>
           )}
-          {specAccounts.length > 0 && (
-            <div className="pt-1 space-y-0.5">
-              {specAccounts.map(a => (
-                <div key={a.id} className="flex items-center justify-between text-xs">
-                  <span className="text-slate-400 truncate pr-2">{a.name}</span>
-                  <span className="text-slate-500 shrink-0">{fmt(a.balance)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+          {specAccounts.map(a => (
+            <TileRow key={a.id} label={a.name}><span className="text-slate-500">{fmt(a.balance)}</span></TileRow>
+          ))}
+        </Tile>
 
         {/* HSA */}
         {hsaAccounts.length > 0 && (
-          <div className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-4 space-y-1">
-            <div className="text-xs text-slate-400 font-medium uppercase tracking-wide">HSA</div>
-            <div className="text-2xl font-bold text-white">{fmt(hsaTotal)}</div>
+          <Tile label="HSA">
+            <TileBigNum>{fmt(hsaTotal)}</TileBigNum>
             {hsaEndForecast !== null && hsaEndForecast !== hsaTotal && (
-              <div className="text-xs text-slate-500">
-                Forecast: <span className={hsaEndForecast >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmt(hsaEndForecast)}</span>
-              </div>
+              <TileRow label="Forecast">
+                <span className={hsaEndForecast >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmt(hsaEndForecast)}</span>
+              </TileRow>
             )}
-            <div className="text-xs text-slate-500">
-              {hsaAccounts.length > 1
-                ? `${hsaAccounts.length} accounts`
-                : hsaAccounts[0]?.institution}
-            </div>
-          </div>
+            <TileRow label={hsaAccounts.length > 1 ? `${hsaAccounts.length} accounts` : (hsaAccounts[0]?.institution ?? '')}><span /></TileRow>
+          </Tile>
         )}
 
         {/* BOA Savings */}
-        <div className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-4 space-y-1">
-          <div className="text-xs text-slate-400 font-medium uppercase tracking-wide">
-            {boaAccount ? boaAccount.institution : 'Savings'}
-          </div>
+        <Tile label={boaAccount ? boaAccount.institution : 'Savings'}>
           {!boaAccount ? (
-            <div className="text-xs text-slate-600">No BOA account found in Savings & Retirement</div>
+            <div className="text-xs text-slate-600 pt-1">No BOA/savings account found</div>
           ) : editingBOA ? (
-            <input
-              autoFocus
+            <input autoFocus
               className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm text-white"
               value={boaDraft}
               onChange={e => setBoaDraft(e.target.value)}
@@ -460,20 +395,17 @@ export function BigPictureModule() {
               onKeyDown={e => { if (e.key === 'Enter') commitBOA(); if (e.key === 'Escape') setEditingBOA(false) }}
             />
           ) : (
-            <button
-              onClick={() => { setBoaDraft(boaAccount.balance.toString()); setEditingBOA(true) }}
-              className="text-2xl font-bold text-white hover:text-blue-300 transition-colors text-left w-full"
-            >
+            <TileBigNum onEdit={() => { setBoaDraft(boaAccount.balance.toString()); setEditingBOA(true) }}>
               {fmt(boaAccount.balance)}
-            </button>
+            </TileBigNum>
           )}
           {boaAccount && boaEndForecast !== null && boaEndForecast !== boaAccount.balance && (
-            <div className="text-xs text-slate-500">
-              Forecast: <span className={boaEndForecast >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmt(boaEndForecast)}</span>
-            </div>
+            <TileRow label="Forecast">
+              <span className={boaEndForecast >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmt(boaEndForecast)}</span>
+            </TileRow>
           )}
-          {boaAccount && <div className="text-xs text-slate-500">{boaAccount.name}</div>}
-        </div>
+          {boaAccount && <TileRow label={boaAccount.name}><span /></TileRow>}
+        </Tile>
       </div>
 
       {/* Forecast items */}
@@ -573,6 +505,58 @@ export function BigPictureModule() {
     </div>
   )
 }
+
+// ── Shared tile sub-components ────────────────────────────────────────────────
+
+function Tile({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-4 flex flex-col gap-1 min-h-[110px]">
+      <div className="text-xs text-slate-400 font-medium uppercase tracking-widest mb-0.5">{label}</div>
+      {children}
+    </div>
+  )
+}
+
+function TileBigNum({ children, onEdit }: { children: React.ReactNode; onEdit?: () => void }) {
+  if (onEdit) {
+    return (
+      <button onClick={onEdit} className="text-2xl font-bold text-white hover:text-blue-300 transition-colors text-left w-full leading-tight">
+        {children ?? <span className="text-slate-500 text-sm font-normal">tap to set</span>}
+      </button>
+    )
+  }
+  return <div className="text-2xl font-bold text-white leading-tight">{children}</div>
+}
+
+function TileRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between text-xs">
+      <span className="text-slate-500 truncate pr-2">{label}</span>
+      <span className="shrink-0">{children}</span>
+    </div>
+  )
+}
+
+function TileCollapsible({ open, onToggle, summary, children }: {
+  open: boolean
+  onToggle: () => void
+  summary: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <div className="mt-0.5">
+      <button onClick={onToggle} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors w-full text-left">
+        <svg className={`w-2.5 h-2.5 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+        {summary}
+      </button>
+      {open && <div className="mt-1 space-y-0.5 pl-3">{children}</div>}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface ForecastRowProps {
   item: ForecastItem & { runningBalance: number }
