@@ -164,6 +164,29 @@ export function BigPictureModule() {
     return a ? `${a.institution} – ${a.name}` : id
   }
 
+  // ── Forecast item totals per account (for tile end-state) ────────────────
+  const forecastTotals: Record<string, number> = {}
+  for (const fi of forecastItems) {
+    forecastTotals[fi.accountId] = (forecastTotals[fi.accountId] ?? 0) + fi.amount
+  }
+
+  // End-state forecasts for each tile
+  const checkingEndForecast = periodForecast !== null
+    ? periodForecast + (forecastTotals['checking'] ?? 0)
+    : null
+  const ccEndForecast = ccProjectedFinal !== null
+    ? ccProjectedFinal + (forecastTotals['cc'] ?? 0)
+    : null
+  const boaEndForecast = boaAccount
+    ? boaAccount.balance + (forecastTotals[boaAccount.id] ?? 0)
+    : null
+  const hsaEndForecast = hsaAccounts.length > 0
+    ? hsaTotal + hsaAccounts.reduce((s, a) => s + (forecastTotals[a.id] ?? 0), 0)
+    : null
+  const specEndForecast = specAccounts.length > 0
+    ? specTotal + specAccounts.reduce((s, a) => s + (forecastTotals[a.id] ?? 0), 0)
+    : null
+
   // Compute running balances per account
   const sortedItems = [...forecastItems].sort((a, b) => a.date.localeCompare(b.date))
 
@@ -221,11 +244,14 @@ export function BigPictureModule() {
             </button>
           )}
           <div className="text-xs text-slate-500">
-            Period end:{' '}
-            {periodForecast !== null
-              ? <span className={periodForecast >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmt(periodForecast)}</span>
+            Forecast:{' '}
+            {checkingEndForecast !== null
+              ? <span className={checkingEndForecast >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmt(checkingEndForecast)}</span>
               : <span className="text-slate-600">—</span>
             }
+            {forecastTotals['checking'] && periodForecast !== null && (
+              <span className="text-slate-600 ml-1">(period {fmt(periodForecast)})</span>
+            )}
           </div>
           {stillOutItems.length > 0 && (
             <div className="pt-1">
@@ -274,11 +300,14 @@ export function BigPictureModule() {
             </button>
           )}
           <div className="text-xs text-slate-500">
-            Projected:{' '}
-            {ccProjectedFinal !== null
-              ? <span className="text-amber-400">{fmt(ccProjectedFinal)}</span>
+            Forecast:{' '}
+            {ccEndForecast !== null
+              ? <span className="text-amber-400">{fmt(ccEndForecast)}</span>
               : <span className="text-slate-600">—</span>
             }
+            {forecastTotals['cc'] && ccProjectedFinal !== null && (
+              <span className="text-slate-600 ml-1">(period {fmt(ccProjectedFinal)})</span>
+            )}
           </div>
           {remainingRecurring.length > 0 && ccCurrentBalance !== null && (
             <div className="pt-1">
@@ -310,6 +339,11 @@ export function BigPictureModule() {
         <div className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-4 space-y-1">
           <div className="text-xs text-slate-400 font-medium uppercase tracking-wide">Spec Total</div>
           <div className="text-2xl font-bold text-white">{fmt(specTotal)}</div>
+          {specEndForecast !== null && specEndForecast !== specTotal && (
+            <div className="text-xs text-slate-500">
+              Forecast: <span className={specEndForecast >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmt(specEndForecast)}</span>
+            </div>
+          )}
           {specAccounts.length > 0 && (
             <div className="pt-1 space-y-0.5">
               {specAccounts.map(a => (
@@ -327,6 +361,11 @@ export function BigPictureModule() {
           <div className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-4 space-y-1">
             <div className="text-xs text-slate-400 font-medium uppercase tracking-wide">HSA</div>
             <div className="text-2xl font-bold text-white">{fmt(hsaTotal)}</div>
+            {hsaEndForecast !== null && hsaEndForecast !== hsaTotal && (
+              <div className="text-xs text-slate-500">
+                Forecast: <span className={hsaEndForecast >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmt(hsaEndForecast)}</span>
+              </div>
+            )}
             <div className="text-xs text-slate-500">
               {hsaAccounts.length > 1
                 ? `${hsaAccounts.length} accounts`
@@ -358,6 +397,11 @@ export function BigPictureModule() {
             >
               {fmt(boaAccount.balance)}
             </button>
+          )}
+          {boaAccount && boaEndForecast !== null && boaEndForecast !== boaAccount.balance && (
+            <div className="text-xs text-slate-500">
+              Forecast: <span className={boaEndForecast >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmt(boaEndForecast)}</span>
+            </div>
           )}
           {boaAccount && <div className="text-xs text-slate-500">{boaAccount.name}</div>}
         </div>
