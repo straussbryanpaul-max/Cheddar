@@ -194,10 +194,8 @@ export function BigPictureModule() {
 
   if (currentPeriod) {
     const currentPeriodIdx = periods.findIndex(p => p.id === currentPeriod.id)
-    const affectedCheckingIds = new Set([currentPeriod.id, ...Array.from(checkingByPeriod.keys())])
-    const lastIdx = periods.reduce((max, p, i) =>
-      affectedCheckingIds.has(p.id) && i >= currentPeriodIdx ? Math.max(max, i) : max, currentPeriodIdx)
     const allProjectedOpenings = buildProjectedOpenings(periods, periodItems, extras, bills)
+    const lastIdx = Math.min(currentPeriodIdx + 5, periods.length - 1)
 
     let prevEnd: number | null = null
     for (let i = currentPeriodIdx; i <= lastIdx; i++) {
@@ -208,19 +206,17 @@ export function BigPictureModule() {
       if (opening === null) break
       const baseForecast = calcForecast(
         { ...p, openingBalance: opening },
-        periodItems.filter(i => i.periodId === p.id),
+        periodItems.filter(item => item.periodId === p.id),
         bills,
         extras.filter(e => e.periodId === p.id),
       )
       if (baseForecast === null) break
       const end = baseForecast + (checkingByPeriod.get(p.id) ?? 0)
-      if (affectedCheckingIds.has(p.id)) {
-        checkingPeriodRows.push({
-          label: `${formatDate(p.startDate)} – ${formatDate(periodEndDate(p.startDate, payFrequency))}`,
-          end,
-          isCurrent: p.id === currentPeriod.id,
-        })
-      }
+      checkingPeriodRows.push({
+        label: `${formatDate(p.startDate)} – ${formatDate(periodEndDate(p.startDate, payFrequency))}`,
+        end,
+        isCurrent: p.id === currentPeriod.id,
+      })
       prevEnd = end
     }
   }
