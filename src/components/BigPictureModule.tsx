@@ -56,6 +56,23 @@ export function BigPictureModule() {
     ? calcForecast(currentPeriod, periodItems, bills, extras)
     : null
 
+  // ── Unpaid items still coming out of checking ─────────────────────────────
+  const [stillOutOpen, setStillOutOpen] = useState(false)
+  const unpaidItems = currentPeriod
+    ? periodItems
+        .filter(i => i.periodId === currentPeriod.id && !i.paid && !i.dismissed)
+        .map(i => {
+          const bill = bills.find(b => b.id === i.billId)
+          return bill ? { name: bill.name, amount: i.actualAmount ?? bill.amount } : null
+        })
+        .filter((x): x is { name: string; amount: number } => x !== null)
+    : []
+  const unpaidExtras = currentPeriod
+    ? extras.filter(e => e.periodId === currentPeriod.id && !e.paid).map(e => ({ name: e.name, amount: e.amount }))
+    : []
+  const stillOutItems = [...unpaidItems, ...unpaidExtras]
+  const stillOutTotal = stillOutItems.reduce((s, i) => s + i.amount, 0)
+
   // ── CC projection ─────────────────────────────────────────────────────────
   const { ccCurrentBalance, ccProjectionBaseId } = uiPrefs
   const [editingCC, setEditingCC] = useState(false)
@@ -205,6 +222,30 @@ export function BigPictureModule() {
               : <span className="text-slate-600">—</span>
             }
           </div>
+          {stillOutItems.length > 0 && (
+            <div className="pt-1">
+              <button
+                onClick={() => setStillOutOpen(o => !o)}
+                className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                <svg className={`w-3 h-3 transition-transform ${stillOutOpen ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+                <span className="text-amber-500/80">{fmt(stillOutTotal)} still out</span>
+                <span className="text-slate-600">({stillOutItems.length})</span>
+              </button>
+              {stillOutOpen && (
+                <div className="mt-1.5 space-y-0.5 pl-4">
+                  {stillOutItems.map((item, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs">
+                      <span className="text-slate-400 truncate pr-2">{item.name}</span>
+                      <span className="text-slate-500 shrink-0">{fmt(item.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* CC */}
