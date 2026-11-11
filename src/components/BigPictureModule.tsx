@@ -102,6 +102,7 @@ export function BigPictureModule() {
   const ccProjectedFinal = ccCurrentBalance !== null
     ? ccCurrentBalance + remainingRecurringTotal
     : null
+  const [ccStillOutOpen, setCCStillOutOpen] = useState(false)
 
   // ── Spec accounts ─────────────────────────────────────────────────────────
   const specAccounts = wealthAccounts.filter(a =>
@@ -276,8 +277,27 @@ export function BigPictureModule() {
             }
           </div>
           {remainingRecurring.length > 0 && ccCurrentBalance !== null && (
-            <div className="text-xs text-slate-600 pt-1">
-              +{fmt(remainingRecurringTotal)} still expected
+            <div className="pt-1">
+              <button
+                onClick={() => setCCStillOutOpen(o => !o)}
+                className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                <svg className={`w-3 h-3 transition-transform ${ccStillOutOpen ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+                <span className="text-amber-500/80">+{fmt(remainingRecurringTotal)} still expected</span>
+                <span className="text-slate-600">({remainingRecurring.length})</span>
+              </button>
+              {ccStillOutOpen && (
+                <div className="mt-1.5 space-y-0.5 pl-4">
+                  {remainingRecurring.map(tx => (
+                    <div key={tx.id} className="flex items-center justify-between text-xs">
+                      <span className="text-slate-400 truncate pr-2">{tx.description}</span>
+                      <span className="text-slate-500 shrink-0">{fmtExact(tx.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -316,24 +336,6 @@ export function BigPictureModule() {
           {boaAccount && <div className="text-xs text-slate-500">{boaAccount.name}</div>}
         </div>
       </div>
-
-      {/* CC notes */}
-      {baseAnalysis && remainingRecurring.length > 0 && ccCurrentBalance !== null && (
-        <div className="bg-slate-800/40 border border-slate-700/30 rounded-xl p-4">
-          <div className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-2">Still Expected on CC</div>
-          <div className="space-y-1">
-            {remainingRecurring.map(tx => (
-              <div key={tx.id} className="flex items-center justify-between text-sm">
-                <span className="text-slate-300">{tx.description}</span>
-                <div className="flex items-center gap-3 text-slate-400">
-                  <span className="text-xs">{tx.date}</span>
-                  <span>{fmtExact(tx.amount)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Forecast items */}
       <div className="bg-slate-800/40 border border-slate-700/30 rounded-xl p-4">
