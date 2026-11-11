@@ -11,6 +11,7 @@ import { CCModule } from './components/CCModule'
 import { CollegeModule } from './components/CollegeModule'
 import { BigPictureModule } from './components/BigPictureModule'
 import { BonusCalcModule } from './components/BonusCalcModule'
+import { DataSecurityModule } from './components/DataSecurityModule'
 import { LoginScreen } from './components/LoginScreen'
 import { HouseholdOnboarding } from './components/HouseholdOnboarding'
 import { useAuth } from './lib/auth'
@@ -25,6 +26,7 @@ const MODULES: { id: AppModule; label: string; soon?: boolean }[] = [
   { id: 'cc',      label: 'Credit Card' },
   { id: 'college', label: 'College' },
   { id: 'bonus-calc', label: 'Bonus Calc' },
+  { id: 'data-security', label: 'Data & Security' },
 ]
 
 const GRID_COLS: Record<number, string> = {
@@ -212,6 +214,7 @@ function BudgetApp({ householdId, userId }: { householdId: string; userId: strin
         <main className="flex-1 min-w-0">
           {module === 'big-picture' && <BigPictureModule />}
           {module === 'bonus-calc' && <BonusCalcModule />}
+          {module === 'data-security' && <DataSecurityModule />}
           {module === 'bills'   && <BillsManager />}
           {module === 'savings' && <WealthModule />}
           {module === 'cc'      && <CCModule />}
