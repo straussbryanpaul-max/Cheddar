@@ -33,24 +33,47 @@ function snapshotData(): Record<string, unknown> {
 }
 
 // Tagged push: writes data + sender clientId so we can ignore our own echo.
-async function pushState(householdId: string, userId: string) {
+// Returns the updated_at stamped on the write, or null on failure.
+async function pushState(householdId: string, userId: string): Promise<string | null> {
+  const updatedAt = new Date().toISOString()
   const payload = {
     household_id: householdId,
     data: { ...snapshotData(), _meta: { clientId: CLIENT_ID } },
-    updated_at: new Date().toISOString(),
+    updated_at: updatedAt,
     updated_by: userId,
   }
   const { error } = await supabase
     .from('household_state')
     .upsert(payload, { onConflict: 'household_id' })
-  if (error) console.error('pushState failed', error)
+  if (error) {
+    console.error('pushState failed', error)
+    return null
+  }
+  return updatedAt
 }
 
 // Apply a remote payload to the store, stripping the meta envelope.
-function applyRemote(data: Record<string, unknown>) {
-  const { _meta: _ignored, ...rest } = data as Record<string, unknown> & { _meta?: unknown }
+// GUARD (Nov 15 incident): the row's `data` must be a plain object. If it
+// arrives wrapped in a list (a corrupt write), unwrap a one-element
+// [{data: {...}}] payload; anything else is refused outright — hydrating a
+// bad shape leaves the store on seed defaults, and the next push would
+// overwrite the good row with seed data.
+function applyRemote(data: unknown): boolean {
+  let doc: unknown = data
+  if (Array.isArray(doc)) {
+    console.error('applyRemote: household_state data arrived as a list; attempting unwrap')
+    doc = doc.length === 1 && doc[0] != null && typeof doc[0] === 'object'
+      ? (doc[0] as Record<string, unknown>).data
+      : undefined
+  }
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) {
+    console.error('applyRemote: refusing to hydrate from non-object payload', data)
+    return false
+  }
+  const { _meta: _ignored, ...rest } = doc as Record<string, unknown> & { _meta?: unknown }
   void _ignored
   useStore.getState().hydrate(rest)
+  return true
 }
 
 // Reads the legacy zustand-persist localStorage payload, if any.
@@ -77,11 +100,20 @@ export function useHouseholdSync(householdId: string | null, userId: string | nu
   const ranInitialFetch = useRef(false)
   const pushTimer = useRef<number | null>(null)
   const lastPushedJson = useRef<string>('')
+  // GUARD (Nov 15 incident): only push if this client actually loaded a real
+  // remote doc (or a valid legacy import). A client sitting on seed defaults
+  // must never push — that is how the live row got replaced with seed data.
+  const hydratedFromRemote = useRef(false)
+  // updated_at of the row as this client last saw it. A push is only allowed
+  // while the server row still carries this stamp.
+  const lastSeenUpdatedAt = useRef<string | null>(null)
 
   // Reset the "ran initial fetch" flag when household or user changes.
   useEffect(() => {
     ranInitialFetch.current = false
     lastPushedJson.current = ''
+    hydratedFromRemote.current = false
+    lastSeenUpdatedAt.current = null
     useStore.getState().setHydrated(false)
   }, [householdId, userId])
 
@@ -92,7 +124,7 @@ export function useHouseholdSync(householdId: string | null, userId: string | nu
     ;(async () => {
       const { data, error } = await supabase
         .from('household_state')
-        .select('data')
+        .select('data, updated_at')
         .eq('household_id', householdId)
         .maybeSingle()
       if (error) {
@@ -100,14 +132,19 @@ export function useHouseholdSync(householdId: string | null, userId: string | nu
         useStore.getState().setHydrated(true)
         return
       }
-      const remoteEmpty = !data?.data || Object.keys(data.data).length === 0
+      const row = data as { data?: unknown; updated_at?: string | null } | null
+      const remoteEmpty = !row?.data || (typeof row.data === 'object' && !Array.isArray(row.data) && Object.keys(row.data as Record<string, unknown>).length === 0)
       if (!remoteEmpty) {
-        applyRemote(data!.data as Record<string, unknown>)
+        if (applyRemote(row!.data)) {
+          hydratedFromRemote.current = true
+          lastSeenUpdatedAt.current = row!.updated_at ?? null
+        }
       } else {
         // First load on this household: try to import legacy localStorage data.
         const legacy = readLegacyLocalStorage()
         if (legacy) {
           useStore.getState().hydrate(legacy)
+          hydratedFromRemote.current = true
           // Clear so we don't re-import next time.
           window.localStorage.removeItem('cheddar-store-v4')
           window.localStorage.removeItem('cheddar-store-v3')
@@ -126,10 +163,36 @@ export function useHouseholdSync(householdId: string | null, userId: string | nu
       if (!useStore.getState().hydrated) return
       if (pushTimer.current) window.clearTimeout(pushTimer.current)
       pushTimer.current = window.setTimeout(() => {
-        const json = JSON.stringify(snapshotData())
-        if (json === lastPushedJson.current) return
-        lastPushedJson.current = json
-        pushState(householdId, userId)
+        void (async () => {
+          // GUARD (Nov 15 incident): never push seed/stale state. Only push
+          // if this client actually loaded a real remote doc.
+          if (!hydratedFromRemote.current) return
+          const json = JSON.stringify(snapshotData())
+          if (json === lastPushedJson.current) return
+          // GUARD: only push while the server row is still the one we loaded.
+          // If someone else wrote first, drop our push and re-hydrate from
+          // the newer row instead of overwriting it.
+          const { data: fresh, error: freshError } = await supabase
+            .from('household_state')
+            .select('data, updated_at')
+            .eq('household_id', householdId)
+            .maybeSingle()
+          if (freshError) {
+            console.error('push guard: could not re-check updated_at, skipping push', freshError)
+            return
+          }
+          const freshRow = fresh as { data?: unknown; updated_at?: string | null } | null
+          if (freshRow?.updated_at && lastSeenUpdatedAt.current && freshRow.updated_at !== lastSeenUpdatedAt.current) {
+            if (applyRemote(freshRow.data)) {
+              lastSeenUpdatedAt.current = freshRow.updated_at
+              lastPushedJson.current = JSON.stringify(snapshotData())
+            }
+            return
+          }
+          lastPushedJson.current = json
+          const pushedAt = await pushState(householdId, userId)
+          if (pushedAt) lastSeenUpdatedAt.current = pushedAt
+        })()
       }, 600)
     })
     return () => {
@@ -152,13 +215,16 @@ export function useHouseholdSync(householdId: string | null, userId: string | nu
           filter: `household_id=eq.${householdId}`,
         },
         (payload) => {
-          const newRow = payload.new as { data?: Record<string, unknown> } | null
+          const newRow = payload.new as { data?: unknown; updated_at?: string | null } | null
           if (!newRow?.data) return
-          const meta = newRow.data._meta as { clientId?: string } | undefined
+          const raw = newRow.data
+          const meta = (Array.isArray(raw) ? undefined : (raw as { _meta?: { clientId?: string } })._meta)
           if (meta?.clientId === CLIENT_ID) return  // our own echo
-          applyRemote(newRow.data)
-          // Sync the lastPushed marker so we don't fight the remote write.
-          lastPushedJson.current = JSON.stringify(snapshotData())
+          if (applyRemote(raw)) {
+            if (newRow.updated_at) lastSeenUpdatedAt.current = newRow.updated_at
+            // Sync the lastPushed marker so we don't fight the remote write.
+            lastPushedJson.current = JSON.stringify(snapshotData())
+          }
         }
       )
       .subscribe()
