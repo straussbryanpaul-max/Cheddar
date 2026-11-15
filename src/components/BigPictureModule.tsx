@@ -158,14 +158,19 @@ export function BigPictureModule() {
     setAddingItem(false)
   }
 
-  // Build account options for the forecast item selector
+  // Build account options for the forecast item selector.
+  // Spec buckets are one rolled-up "Spec" section, so the selector offers a
+  // single Spec option instead of every individual bucket.
   const savingsAccounts = wealthAccounts.filter(a =>
     ['checking', 'savings', 'money_market', 'cd', 'hsa'].includes(a.type)
   )
   const accountOptions: { id: string; label: string }[] = [
     { id: 'checking', label: 'Checking' },
     { id: 'cc', label: 'Credit Card' },
-    ...savingsAccounts.map(a => ({ id: a.id, label: `${a.institution} – ${a.name}` })),
+    ...(specAccounts.length > 0 ? [{ id: 'spec', label: 'Spec' }] : []),
+    ...savingsAccounts
+      .filter(a => !specAccounts.some(s => s.id === a.id))
+      .map(a => ({ id: a.id, label: `${a.institution} – ${a.name}` })),
   ]
 
   function accountLabel(id: string) {
@@ -267,7 +272,7 @@ export function BigPictureModule() {
     ? hsaTotal + hsaAccounts.reduce((s, a) => s + (forecastTotals[a.id] ?? 0), 0)
     : null
   const specEndForecast = specAccounts.length > 0
-    ? specTotal + specAccounts.reduce((s, a) => s + (forecastTotals[a.id] ?? 0), 0)
+    ? specTotal + (forecastTotals['spec'] ?? 0) + specAccounts.reduce((s, a) => s + (forecastTotals[a.id] ?? 0), 0)
     : null
 
   // Spec accounts (Safety Net, Travel, ...) are one "Spec" section in the
