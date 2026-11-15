@@ -109,7 +109,6 @@ export function BigPictureModule() {
     : null
   const [selectedPeriodIdx, setSelectedPeriodIdx] = useState(0)
   const [ccStillOutOpen, setCCStillOutOpen] = useState(false)
-  const [specOpen, setSpecOpen] = useState(false)
   const [hsaOpen, setHsaOpen] = useState(false)
   const [forecastOpen, setForecastOpen] = useState(true)
   const [openAccts, setOpenAccts] = useState<Record<string, boolean>>({})
@@ -170,6 +169,7 @@ export function BigPictureModule() {
   function accountLabel(id: string) {
     if (id === 'checking') return 'Checking'
     if (id === 'cc') return 'Credit Card'
+    if (id === 'spec') return 'Spec'
     const a = wealthAccounts.find(w => w.id === id)
     return a ? `${a.institution} – ${a.name}` : id
   }
@@ -266,6 +266,12 @@ export function BigPictureModule() {
     ? specTotal + specAccounts.reduce((s, a) => s + (forecastTotals[a.id] ?? 0), 0)
     : null
 
+  // Spec accounts (Safety Net, Travel, ...) are one "Spec" section in the
+  // forecast list — forecast items assigned to any Spec bucket share one
+  // running balance from the Spec total.
+  const specAccountIds = new Set(specAccounts.map(a => a.id))
+  const groupKey = (accountId: string) => specAccountIds.has(accountId) ? 'spec' : accountId
+
   // Compute running balances per account
   const sortedItems = [...forecastItems].sort((a, b) => a.date.localeCompare(b.date))
 
@@ -273,18 +279,20 @@ export function BigPictureModule() {
   const accountBalances: Record<string, number> = {
     checking: checkingBalance ?? 0,
     cc: ccProjectedFinal ?? ccCurrentBalance ?? 0,
+    spec: specTotal,
     ...savingsAccounts.reduce((acc, a) => ({ ...acc, [a.id]: a.balance }), {}),
   }
 
   const itemsWithRunning = sortedItems.map(item => {
-    accountBalances[item.accountId] = (accountBalances[item.accountId] ?? 0) + item.amount
-    return { ...item, runningBalance: accountBalances[item.accountId] }
+    const key = groupKey(item.accountId)
+    accountBalances[key] = (accountBalances[key] ?? 0) + item.amount
+    return { ...item, runningBalance: accountBalances[key] }
   })
 
   // ── Account label shorthand ────────────────────────────────────────────────
   const acctGrouped = Object.entries(
     itemsWithRunning.reduce<Record<string, typeof itemsWithRunning>>((acc, item) => {
-      const key = item.accountId
+      const key = groupKey(item.accountId)
       if (!acc[key]) acc[key] = []
       acc[key].push(item)
       return acc
@@ -382,23 +390,13 @@ export function BigPictureModule() {
           )}
         </Tile>
 
-        {/* Spec */}
+        {/* Spec — one total, no per-account breakdown */}
         <Tile label="Spec">
           <TileBigNum>{fmt(specTotal)}</TileBigNum>
           {specEndForecast !== null && specEndForecast !== specTotal && (
             <TileRow label="Forecast">
               <span className="text-sm font-semibold text-slate-100">{fmt(specEndForecast)}</span>
             </TileRow>
-          )}
-          {specAccounts.length > 0 && (
-            <TileCollapsible
-              open={specOpen} onToggle={() => setSpecOpen(o => !o)}
-              summary={<span className="text-slate-500">{specAccounts.length} account{specAccounts.length !== 1 ? 's' : ''}</span>}
-            >
-              {specAccounts.map(a => (
-                <TileRow key={a.id} label={a.name}><span className="text-slate-500">{fmt(a.balance)}</span></TileRow>
-              ))}
-            </TileCollapsible>
           )}
         </Tile>
 
