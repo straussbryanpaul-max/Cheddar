@@ -4,7 +4,7 @@ import { useAuth } from '../lib/auth'
 import { analyzeCreditCard, analyzeMidPeriod, matchAmazonSubscribeSave, type StatementFile } from '../lib/analyzeCreditCard'
 import { useFormatCurrency } from '../lib/useFormatCurrency'
 import { CCCharts } from './CCCharts'
-import type { CCMonthlyAnalysis, CCTransaction, AmazonSubscribeItem } from '../types'
+import type { CCMonthlyAnalysis, CCTransaction, AmazonSubscribeItem, ForecastItem } from '../types'
 
 const CC_CATEGORIES = [
   'Groceries', 'Dining', 'Gas', 'Amazon',
@@ -59,6 +59,8 @@ export function CCModule() {
   const storedSelectedId = useStore(s => s.uiPrefs.ccSelectedId)
   const ccCurrentBalance = useStore(s => s.uiPrefs.ccCurrentBalance)
   const ccProjectionBaseId = useStore(s => s.uiPrefs.ccProjectionBaseId)
+  const ccStatementCloseDay = useStore(s => s.uiPrefs.ccStatementCloseDay)
+  const forecastItems = useStore(s => s.forecastItems)
   const recurringOpen = useStore(s => s.uiPrefs.ccRecurringOpen)
   const oneOffOpen = useStore(s => s.uiPrefs.ccOneOffOpen)
   const allTxOpen = useStore(s => s.uiPrefs.ccAllTxOpen)
@@ -638,17 +640,25 @@ export function CCModule() {
         const baseTxs = baseAnalysis
           ? (personFilter === 'All' ? baseAnalysis.transactions : baseAnalysis.transactions.filter(tx => tx.person === personFilter))
           : []
-        // Only include recurring charges that typically post AFTER today (not yet in current balance)
+        // Only include recurring charges that typically post AFTER today (not yet in current balance),
+        // and on/before the statement close day — later ones belong to next month's statement.
         const remainingRecurring = baseTxs.filter(tx => {
           if (!tx.isRecurring) return false
           const day = new Date(tx.date + 'T12:00:00').getDate()
-          return day > todayDay
+          return day > todayDay && day <= (ccStatementCloseDay ?? 31)
         })
         const remainingRecurringTotal = remainingRecurring.reduce((s, tx) => s + tx.amount, 0)
         const alreadyPostedRecurring = baseTxs.filter(tx =>
           tx.isRecurring && new Date(tx.date + 'T12:00:00').getDate() <= todayDay
         )
-        const projected = (ccCurrentBalance ?? 0) + remainingRecurringTotal
+        // CC forecast items for the current month (negative = charge) also land
+        // on this statement — a charge raises the owed total.
+        const _d = new Date()
+        const currentMonth = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}`
+        const ccForecastThisMonth = forecastItems
+          .filter((fi: ForecastItem) => fi.accountId === 'cc' && fi.date.slice(0, 7) === currentMonth)
+          .reduce((s: number, fi: ForecastItem) => s + fi.amount, 0)
+        const projected = (ccCurrentBalance ?? 0) + remainingRecurringTotal - ccForecastThisMonth
         return (
           <div className="bg-slate-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4">
             <div className="flex-1">
@@ -711,7 +721,7 @@ export function CCModule() {
               </div>
               <div className="text-xs text-slate-600 mt-0.5">
                 {ccCurrentBalance != null
-                  ? `Current ${fmt(ccCurrentBalance)} + ${fmt(remainingRecurringTotal)} still coming (${remainingRecurring.length} of ${(alreadyPostedRecurring.length + remainingRecurring.length)} recurring after day ${todayDay})`
+                  ? `Current ${fmt(ccCurrentBalance)} + ${fmt(remainingRecurringTotal)} still coming (${remainingRecurring.length} of ${(alreadyPostedRecurring.length + remainingRecurring.length)} recurring after day ${todayDay})${ccForecastThisMonth !== 0 ? ` + ${fmt(-ccForecastThisMonth)} forecast` : ''}`
                   : 'Enter current balance to project'}
               </div>
             </div>

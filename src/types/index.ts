@@ -320,6 +320,7 @@ export interface UiPrefs {
   ccSSListOpen: boolean
   ccCurrentBalance: number | null
   ccProjectionBaseId: string | null
+  ccStatementCloseDay: number | null
   collegeYearUi: Record<string, { collapsed: boolean; contribsOpen: boolean; expensesOpen: boolean }>
   wealthTab: WealthTab
   wealthAccountExpanded: Record<string, boolean>

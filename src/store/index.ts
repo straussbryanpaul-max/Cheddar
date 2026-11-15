@@ -306,6 +306,7 @@ export const useStore = create<State>()(
         ccSSListOpen: true,
         ccCurrentBalance: null,
         ccProjectionBaseId: null,
+        ccStatementCloseDay: null,
         collegeYearUi: {},
         wealthTab: 'accounts',
         wealthAccountExpanded: {},

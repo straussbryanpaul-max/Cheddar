@@ -79,7 +79,7 @@ export function BigPictureModule() {
   const stillOutTotal = stillOutItems.reduce((s, i) => s + i.amount, 0)
 
   // ── CC projection ─────────────────────────────────────────────────────────
-  const { ccCurrentBalance, ccProjectionBaseId } = uiPrefs
+  const { ccCurrentBalance, ccProjectionBaseId, ccStatementCloseDay } = uiPrefs
   const [editingCC, setEditingCC] = useState(false)
   const [ccDraft, setCCDraft] = useState('')
 
@@ -95,13 +95,15 @@ export function BigPictureModule() {
     ? ccAnalyses.find(a => a.id === ccProjectionBaseId)
     : sortedAnalyses[0]
 
-  // Remaining recurring charges after today's day-of-month
+  // Remaining recurring charges after today's day-of-month, but only up to
+  // the statement close day — later ones belong to next month's statement.
   const todayDay = new Date().getDate()
+  const closeDay = ccStatementCloseDay ?? 31
   const baseTxs = baseAnalysis?.transactions ?? []
   const remainingRecurring = baseTxs.filter(tx => {
     if (!tx.isRecurring) return false
     const day = parseInt(tx.date.split('-')[2] ?? '0', 10)
-    return day > todayDay
+    return day > todayDay && day <= closeDay
   })
   const remainingRecurringTotal = remainingRecurring.reduce((s, tx) => s + tx.amount, 0)
   const ccProjectedFinal = ccCurrentBalance !== null
@@ -239,10 +241,12 @@ export function BigPictureModule() {
     let running = ccCurrentBalance
     for (const month of sortedMonths) {
       const isCurrentMonth = month === currentMonth
+      // CC forecast items use the usual sign (negative = expense), so a
+      // charge raises what you owe — subtract the month's sum.
       if (isCurrentMonth) {
-        running = (ccProjectedFinal ?? ccCurrentBalance) + (ccByMonth.get(month) ?? 0)
+        running = (ccProjectedFinal ?? ccCurrentBalance) - (ccByMonth.get(month) ?? 0)
       } else {
-        running = running + (ccByMonth.get(month) ?? 0)
+        running = running - (ccByMonth.get(month) ?? 0)
       }
       const [y, m] = month.split('-')
       const label = new Date(parseInt(y!), parseInt(m!) - 1, 1)
@@ -285,7 +289,9 @@ export function BigPictureModule() {
 
   const itemsWithRunning = sortedItems.map(item => {
     const key = groupKey(item.accountId)
-    accountBalances[key] = (accountBalances[key] ?? 0) + item.amount
+    // For the card, a negative (expense) item raises the owed balance.
+    const delta = key === 'cc' ? -item.amount : item.amount
+    accountBalances[key] = (accountBalances[key] ?? 0) + delta
     return { ...item, runningBalance: accountBalances[key] }
   })
 
