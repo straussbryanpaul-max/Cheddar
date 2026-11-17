@@ -20,14 +20,65 @@ const EXCLUDED_KEYS = new Set<string>([
   'hydrated',         // local sync flag
 ])
 
-// Snapshot only the data fields (no functions, no excluded keys).
+// UI-only uiPrefs keys: per-tab view state, not household data. The screen
+// you're on (currentModule), which sections are expanded, which tab or
+// analysis is selected — syncing these is what yanked the screen around
+// (Nov 17: a stale tab's save got dropped by the push guard and the screen
+// snapped back to the module saved in the server row). They never leave the
+// tab, and a remote write never overwrites the local ones.
+// NOTE: ccCurrentBalance / ccProjectionBaseId / ccStatementCloseDay are
+// DATA, not UI — they stay synced, so a balance edit in the Budget view
+// persists instead of snapping back to the Plaid-fed value.
+const UI_ONLY_UIPREFS_KEYS = new Set<string>([
+  'currentModule',
+  'ccSelectedId',
+  'ccRecurringOpen',
+  'ccOneOffOpen',
+  'ccAllTxOpen',
+  'ccExpandedCats',
+  'ccSSListOpen',
+  'collegeYearUi',
+  'wealthTab',
+  'wealthAccountExpanded',
+  'wealthInstitutionExpanded',
+  'wealthCategoryExpanded',
+  'wealthExpandLevel',
+  'periodExpanded',
+])
+
+// Top-level view state, same treatment as the uiPrefs keys above: which
+// periods are shown and the window anchor are per-tab, not household data.
+const UI_ONLY_TOP_LEVEL_KEYS = new Set<string>([
+  'periodsVisible',
+  'periodsWindowDate',
+])
+
+// Copy of a uiPrefs object with the UI-only keys removed (undefined when the
+// input isn't a plain object).
+function stripUiOnlyPrefs(uiPrefs: unknown): Record<string, unknown> | undefined {
+  if (!uiPrefs || typeof uiPrefs !== 'object' || Array.isArray(uiPrefs)) return undefined
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(uiPrefs as Record<string, unknown>)) {
+    if (UI_ONLY_UIPREFS_KEYS.has(k)) continue
+    out[k] = v
+  }
+  return out
+}
+
+// Snapshot only the data fields (no functions, no excluded keys, no
+// per-tab view state — the screen you're on and expanded sections never
+// leave this tab).
 function snapshotData(): Record<string, unknown> {
   const state = useStore.getState() as unknown as Record<string, unknown>
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(state)) {
     if (typeof v === 'function') continue
     if (EXCLUDED_KEYS.has(k)) continue
+    if (UI_ONLY_TOP_LEVEL_KEYS.has(k)) continue
     out[k] = v
+  }
+  if (out.uiPrefs) {
+    out.uiPrefs = stripUiOnlyPrefs(out.uiPrefs) ?? {}
   }
   return out
 }
@@ -72,6 +123,16 @@ function applyRemote(data: unknown): boolean {
   }
   const { _meta: _ignored, ...rest } = doc as Record<string, unknown> & { _meta?: unknown }
   void _ignored
+  // Preserve this tab's view state: a remote write must never move the
+  // screen you're on or collapse what you have open. hydrate() merges
+  // uiPrefs shallowly, so dropping the UI-only keys from the incoming doc
+  // leaves the local ones untouched. Same for the top-level view keys.
+  if (rest.uiPrefs && typeof rest.uiPrefs === 'object' && !Array.isArray(rest.uiPrefs)) {
+    const kept = stripUiOnlyPrefs(rest.uiPrefs)
+    if (kept) rest.uiPrefs = kept
+    else delete rest.uiPrefs
+  }
+  for (const k of UI_ONLY_TOP_LEVEL_KEYS) delete rest[k]
   useStore.getState().hydrate(rest)
   return true
 }
@@ -183,11 +244,17 @@ export function useHouseholdSync(householdId: string | null, userId: string | nu
           }
           const freshRow = fresh as { data?: unknown; updated_at?: string | null } | null
           if (freshRow?.updated_at && lastSeenUpdatedAt.current && freshRow.updated_at !== lastSeenUpdatedAt.current) {
-            if (applyRemote(freshRow.data)) {
-              lastSeenUpdatedAt.current = freshRow.updated_at
-              lastPushedJson.current = JSON.stringify(snapshotData())
-            }
-            return
+            // Another writer touched the row since we loaded it (an auto-save
+            // run, or this tab's realtime channel missed an event). The old
+            // behaviour dropped our push and re-hydrated from the server,
+            // which silently ate the user's edit and yanked the screen back
+            // to the saved module (Nov 17: CC balance edits in Budget kept
+            // snapping back to the Plaid-fed value; bill toggles reverted).
+            // Single-user household: last-writer-wins — adopt the fresh
+            // stamp and push our snapshot, which already contains the user's
+            // edit. The hydratedFromRemote guard above still blocks pushing
+            // seed/stale state, so a fresh tab can never clobber the row.
+            lastSeenUpdatedAt.current = freshRow.updated_at
           }
           lastPushedJson.current = json
           const pushedAt = await pushState(householdId, userId)
